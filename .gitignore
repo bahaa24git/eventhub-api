@@ -7,6 +7,10 @@ __pycache__/
 .env.*
 *.log
 
+# Bytecode cache
+*.pyo
+*.pyd
+
 # Django
 /staticfiles/
 media/
