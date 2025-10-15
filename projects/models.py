@@ -16,6 +16,10 @@ class SoftDeleteModel(models.Model):
     class Meta:
         abstract = True
 
+class SoftDeleteManager(models.Manager):
+    def get_queryset(self):
+        return super().get_queryset().filter(deleted_at__isnull=True)
+
 
 class Profile(models.Model):
     """User profile (1:1)"""
@@ -23,6 +27,8 @@ class Profile(models.Model):
     phone = models.CharField(max_length=32, blank=True)
     avatar_url = models.CharField(max_length=512, blank=True)
     timezone = models.CharField(max_length=64, default="UTC", blank=True)
+    class Meta:
+        verbose_name_plural = "Profiles"
 
     def __str__(self):
         return f"Profile({self.user})"
@@ -85,6 +91,7 @@ class Label(models.Model):
 
 
 class Task(SoftDeleteModel):
+    objects = SoftDeleteManager()
     class Status(models.TextChoices):
         TODO = "TODO", "To Do"
         IN_PROGRESS = "IN_PROGRESS", "In Progress"
@@ -177,7 +184,7 @@ class Attachment(models.Model):
     task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name="attachments")
     uploader = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name="attachments")
     file = models.FileField(upload_to="attachments/%Y/%m/%d/")
-    filename = models.CharField(max_length=512)
+    filename = models.CharField(max_length=512, blank=True)
     content_type = models.CharField(max_length=128, blank=True)
     size = models.BigIntegerField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
