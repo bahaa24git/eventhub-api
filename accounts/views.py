@@ -9,7 +9,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from rest_framework import serializers
-
+from .serializers import ProfileSerializer
 
 # --- Serializers ---
 class RegisterSerializer(serializers.ModelSerializer):
@@ -43,3 +43,12 @@ class MeView(APIView):
     def get(self, request):
         serializer = UserSerializer(request.user)
         return Response(serializer.data)
+
+
+class ProfileView(generics.RetrieveUpdateAPIView):
+    """View or update the authenticated user's profile"""
+    serializer_class = ProfileSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_object(self):
+        return Profile.objects.get(user=self.request.user)
