@@ -1,5 +1,4 @@
 from rest_framework import viewsets, permissions, filters
-from rest_framework.response import Response
 from django.db.models import Q
 from .models import (
     Project, ProjectMember, Label, Task, Subtask,
@@ -12,19 +11,28 @@ from .serializers import (
 )
 
 
+# --- Custom Permission ---
 class IsProjectMember(permissions.BasePermission):
     """Allow access only to members of the project."""
     def has_object_permission(self, request, view, obj):
+        # Handles models that have a direct or indirect link to Project
         project = getattr(obj, "project", None)
-        if project:
-            return ProjectMember.objects.filter(project=project, user=request.user).exists()
-        return False
+        if not project and hasattr(obj, "task"):
+            project = obj.task.project
+        if not project:
+            return False
+        return ProjectMember.objects.filter(project=project, user=request.user).exists()
 
 
+# --- Project ---
 class ProjectViewSet(viewsets.ModelViewSet):
     queryset = Project.objects.all()
     serializer_class = ProjectSerializer
     permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        # Show only projects where user is a member
+        return Project.objects.filter(members__user=self.request.user)
 
     def perform_create(self, serializer):
         project = serializer.save(created_by=self.request.user)
@@ -33,6 +41,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
         )
 
 
+# --- Project Members ---
 class ProjectMemberViewSet(viewsets.ModelViewSet):
     serializer_class = ProjectMemberSerializer
     permission_classes = [permissions.IsAuthenticated, IsProjectMember]
@@ -40,7 +49,11 @@ class ProjectMemberViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         return ProjectMember.objects.filter(project_id=self.kwargs["project_pk"])
 
+    def perform_create(self, serializer):
+        serializer.save(project_id=self.kwargs["project_pk"])
 
+
+# --- Labels ---
 class LabelViewSet(viewsets.ModelViewSet):
     serializer_class = LabelSerializer
     permission_classes = [permissions.IsAuthenticated, IsProjectMember]
@@ -49,20 +62,21 @@ class LabelViewSet(viewsets.ModelViewSet):
         return Label.objects.filter(project_id=self.kwargs["project_pk"])
 
     def perform_create(self, serializer):
-        project_id = self.kwargs["project_pk"]
-        serializer.save(project_id=project_id)
+        serializer.save(project_id=self.kwargs["project_pk"])
 
 
+# --- Tasks ---
 class TaskViewSet(viewsets.ModelViewSet):
     serializer_class = TaskSerializer
     permission_classes = [permissions.IsAuthenticated, IsProjectMember]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ["title", "description"]
-    ordering_fields = ["priority", "due_date"]
+    ordering_fields = ["priority", "due_date", "created_at"]
 
     def get_queryset(self):
         project_id = self.kwargs.get("project_pk")
         qs = Task.objects.filter(project_id=project_id, deleted_at__isnull=True)
+
         status = self.request.query_params.get("status")
         assignee = self.request.query_params.get("assignee")
         label = self.request.query_params.get("label")
@@ -76,13 +90,28 @@ class TaskViewSet(viewsets.ModelViewSet):
             qs = qs.filter(task_labels__label__id=label)
         if due_before:
             qs = qs.filter(due_date__lte=due_before)
-        return qs
+        return qs.distinct()
 
     def perform_create(self, serializer):
-        project_id = self.kwargs["project_pk"]
-        serializer.save(project_id=project_id, creator=self.request.user)
+        serializer.save(
+            project_id=self.kwargs["project_pk"],
+            creator=self.request.user
+        )
 
 
+# --- Subtasks ---
+class SubtaskViewSet(viewsets.ModelViewSet):
+    serializer_class = SubtaskSerializer
+    permission_classes = [permissions.IsAuthenticated, IsProjectMember]
+
+    def get_queryset(self):
+        return Subtask.objects.filter(task_id=self.kwargs["task_pk"])
+
+    def perform_create(self, serializer):
+        serializer.save(task_id=self.kwargs["task_pk"])
+
+
+# --- Comments ---
 class CommentViewSet(viewsets.ModelViewSet):
     serializer_class = CommentSerializer
     permission_classes = [permissions.IsAuthenticated, IsProjectMember]
@@ -91,10 +120,10 @@ class CommentViewSet(viewsets.ModelViewSet):
         return Comment.objects.filter(task_id=self.kwargs["task_pk"])
 
     def perform_create(self, serializer):
-        task_id = self.kwargs["task_pk"]
-        serializer.save(task_id=task_id, author=self.request.user)
+        serializer.save(task_id=self.kwargs["task_pk"], author=self.request.user)
 
 
+# --- Attachments ---
 class AttachmentViewSet(viewsets.ModelViewSet):
     serializer_class = AttachmentSerializer
     permission_classes = [permissions.IsAuthenticated, IsProjectMember]
@@ -103,10 +132,9 @@ class AttachmentViewSet(viewsets.ModelViewSet):
         return Attachment.objects.filter(task_id=self.kwargs["task_pk"])
 
     def perform_create(self, serializer):
-        task_id = self.kwargs["task_pk"]
         file_obj = self.request.FILES.get("file")
         serializer.save(
-            task_id=task_id,
+            task_id=self.kwargs["task_pk"],
             uploader=self.request.user,
             filename=file_obj.name if file_obj else "",
             size=file_obj.size if file_obj else 0,
