@@ -2,21 +2,46 @@
 
 A backend Event Management API for creating, updating, deleting, and viewing **upcoming events** with auth, capacity rules, filters, and pagination.
 
-## Status
-- Week 1: ✅ Repo + project skeleton
-- Next: Events model & CRUD (Week 2)
+---
 
-## Features (MVP)
-- Events CRUD: title, description, datetime (UTC), location, capacity, organizer
-- Auth: Django auth (JWT optional)
-- Upcoming events endpoint + filters (title, location, date range)
-- Ownership: users manage **their** events only
-- Pagination + proper errors
+## 🚀 Status
 
-## Tech
-Django 5 · DRF · drf-spectacular · django-cors-headers · python-dotenv · WhiteNoise · Gunicorn
+- Week 1: ✅ Repo + project skeleton  
+- Week 2: ✅ Models, Migrations, Admin setup  
+- Week 3: ✅ CRUD endpoints (Projects, Tasks, Labels)  
+- Week 4: ✅ Authentication + Members + Attachments + Comments  
+- Week 5: 🚧 Testing + Documentation + Final polish  
 
-## Quickstart
+---
+
+## 🧠 Features (MVP)
+
+- 🔐 **JWT Auth** (Register, Login, Refresh)
+- 🧩 **Projects CRUD**
+- 👥 **Members** with role-based access (Owner, Admin, Member, Viewer)
+- 🏷️ **Labels** for project tasks
+- 📋 **Tasks CRUD** with status, priority, and due dates
+- ✅ **Subtasks, Comments, and Attachments**
+- 🗑️ Soft Delete for Tasks
+- ⚙️ Filtering, Search, and Ordering for Tasks
+- 📄 Auto-generated API Docs with **drf-spectacular**
+- 🌍 CORS + Pagination + Clean error handling
+
+---
+
+## 🧰 Tech Stack
+
+- Django 5  
+- Django REST Framework  
+- drf-spectacular (OpenAPI / Swagger)  
+- django-cors-headers  
+- python-dotenv  
+---
+
+## ⚡ Quickstart
+
+Clone and set up your local environment:
+
 ```bash
 python -m venv .venv
 # Windows: . .venv/Scripts/activate
