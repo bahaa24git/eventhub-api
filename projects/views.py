@@ -47,10 +47,18 @@ class ProjectMemberViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated, IsProjectMember]
 
     def get_queryset(self):
+        # Only show members for the given project
         return ProjectMember.objects.filter(project_id=self.kwargs["project_pk"])
 
     def perform_create(self, serializer):
-        serializer.save(project_id=self.kwargs["project_pk"])
+        """
+        Allow adding an existing user to the project manually.
+        The request must include the 'user' ID and 'role' in the JSON body.
+        """
+        serializer.save(
+            project_id=self.kwargs["project_pk"],
+            user_id=self.request.data.get("user")
+        )
 
 
 # --- Labels ---

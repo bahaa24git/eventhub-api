@@ -22,7 +22,7 @@ class ProjectMemberSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProjectMember
         fields = ["id", "user", "role", "joined_at"]
-
+        read_only_fields = ["id", "joined_at"]
 
 # --- Label ---
 class LabelSerializer(serializers.ModelSerializer):
