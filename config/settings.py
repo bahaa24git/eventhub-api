@@ -135,13 +135,20 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # --------------------------------------------------------------------------------------
 # Allowed origins with scheme; add ports as needed (e.g., http://localhost:3000)
 CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
+
+CORS_ALLOWED_ORIGINS += [
     o.strip()
     for o in os.getenv(
         "CORS_ALLOWED_ORIGINS",
-        "http://localhost,http://127.0.0.1",
+        "http://localhost,http://127.0.0.1"
     ).split(",")
     if o.strip()
 ]
+
+
 CORS_ALLOW_CREDENTIALS = True
 
 # Django requires scheme in CSRF_TRUSTED_ORIGINS
