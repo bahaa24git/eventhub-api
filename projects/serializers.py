@@ -24,6 +24,7 @@ class ProjectMemberSerializer(serializers.ModelSerializer):
         fields = ["id", "user", "role", "joined_at"]
         read_only_fields = ["id", "joined_at"]
 
+
 # --- Label ---
 class LabelSerializer(serializers.ModelSerializer):
     class Meta:
@@ -76,6 +77,12 @@ class TaskSerializer(serializers.ModelSerializer):
     comments = CommentSerializer(many=True, read_only=True)
     subtasks = SubtaskSerializer(many=True, read_only=True)
 
+    # ✅ make project field injected by view (not required in request)
+    project = serializers.PrimaryKeyRelatedField(
+        queryset=Project.objects.all(),
+        required=False
+    )
+
     class Meta:
         model = Task
         fields = [
@@ -84,6 +91,13 @@ class TaskSerializer(serializers.ModelSerializer):
             "assignees", "labels", "subtasks", "comments",
             "created_at", "updated_at", "deleted_at"
         ]
+        extra_kwargs = {
+            "project": {"read_only": True},
+            "creator": {"read_only": True},
+            "created_at": {"read_only": True},
+            "updated_at": {"read_only": True},
+            "deleted_at": {"read_only": True},
+        }
 
     def get_labels(self, obj):
         # Fetch related labels through TaskLabel relationship

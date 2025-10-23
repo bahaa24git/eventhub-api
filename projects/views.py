@@ -1,5 +1,6 @@
 from rest_framework import viewsets, permissions, filters
 from django.db.models import Q
+from django.utils import timezone
 from .models import (
     Project, ProjectMember, Label, Task, Subtask,
     TaskAssignee, Comment, Attachment
@@ -51,14 +52,16 @@ class ProjectMemberViewSet(viewsets.ModelViewSet):
         return ProjectMember.objects.filter(project_id=self.kwargs["project_pk"])
 
     def perform_create(self, serializer):
-        """
-        Allow adding an existing user to the project manually.
-        The request must include the 'user' ID and 'role' in the JSON body.
-        """
-        serializer.save(
-            project_id=self.kwargs["project_pk"],
-            user_id=self.request.data.get("user")
-        )
+        """Create a new member under a specific project."""
+        project_id = self.kwargs.get("project_pk")
+        if not project_id:
+            raise ValueError("Missing project ID in URL")
+
+        user_id = self.request.data.get("user")
+        if not user_id:
+            raise ValueError("Missing user ID in request")
+
+        serializer.save(project_id=project_id, user_id=user_id)
 
 
 # --- Labels ---
@@ -75,6 +78,12 @@ class LabelViewSet(viewsets.ModelViewSet):
 
 # --- Tasks ---
 class TaskViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for managing project tasks.
+    Supports filtering, searching, and ordering.
+    Automatically attaches the correct project and creator.
+    """
+
     serializer_class = TaskSerializer
     permission_classes = [permissions.IsAuthenticated, IsProjectMember]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
@@ -82,6 +91,7 @@ class TaskViewSet(viewsets.ModelViewSet):
     ordering_fields = ["priority", "due_date", "created_at"]
 
     def get_queryset(self):
+        """Return tasks only for the current project."""
         project_id = self.kwargs.get("project_pk")
         qs = Task.objects.filter(project_id=project_id, deleted_at__isnull=True)
 
@@ -98,13 +108,28 @@ class TaskViewSet(viewsets.ModelViewSet):
             qs = qs.filter(task_labels__label__id=label)
         if due_before:
             qs = qs.filter(due_date__lte=due_before)
+
         return qs.distinct()
 
     def perform_create(self, serializer):
-        serializer.save(
-            project_id=self.kwargs["project_pk"],
-            creator=self.request.user
-        )
+        """Automatically link the new task to its project and assign the creator."""
+        project_id = self.kwargs.get("project_pk")
+        project = Project.objects.get(id=project_id)
+        serializer.save(project=project, creator=self.request.user)
+
+    def perform_update(self, serializer):
+        """Ensure project remains fixed when updating a task."""
+        project_id = self.kwargs.get("project_pk")
+        project = Project.objects.get(id=project_id)
+        serializer.save(project=project)
+
+    def perform_destroy(self, instance):
+        """Soft delete if `deleted_at` exists, otherwise delete normally."""
+        if hasattr(instance, "deleted_at"):
+            instance.deleted_at = timezone.now()
+            instance.save()
+        else:
+            instance.delete()
 
 
 # --- Subtasks ---
