@@ -22,10 +22,8 @@ function Login() {
 
       if (response.status === 200) {
         alert("Login successful!");
-        localStorage.setItem(
-          "token",
-          response.data.token || response.data.access || ""
-        );
+        localStorage.setItem("token", response.data.access);
+        localStorage.setItem("refresh", response.data.refresh);
         window.location.href = "/dashboard";
       }
     } catch (error) {

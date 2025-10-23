@@ -7,6 +7,7 @@ from pathlib import Path
 import os
 from dotenv import load_dotenv
 import dj_database_url
+from corsheaders.defaults import default_headers
 
 # --------------------------------------------------------------------------------------
 # Base paths & .env
@@ -150,6 +151,9 @@ CORS_ALLOWED_ORIGINS += [
 
 
 CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_HEADERS = list(default_headers) + [
+    "authorization",
+]
 
 # Django requires scheme in CSRF_TRUSTED_ORIGINS
 CSRF_TRUSTED_ORIGINS = [
@@ -165,26 +169,17 @@ CSRF_TRUSTED_ORIGINS = [
 # DRF / OpenAPI / Auth
 # --------------------------------------------------------------------------------------
 REST_FRAMEWORK = {
-    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        # Session auth (handy for browsable API during dev)
-        "rest_framework.authentication.SessionAuthentication",
-        # JWT (since you installed djangorestframework-simplejwt)
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
-        # AllowAny for skeleton; tighten to IsAuthenticated when you implement endpoints
-        "rest_framework.permissions.AllowAny",
+        "rest_framework.permissions.IsAuthenticated",
     ],
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 20,
 }
-REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
-    ],
-    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
-}
+
 
 SPECTACULAR_SETTINGS = {
     "TITLE": "EventHub API",
