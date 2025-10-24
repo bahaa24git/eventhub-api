@@ -1,32 +1,37 @@
 import React, { useState } from "react";
 import axios from "axios";
 
-function Login() {
+function Register() {
   const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleLogin = async (e) => {
+  const handleRegister = async (e) => {
     e.preventDefault();
+
+    if (password !== confirm) {
+      alert("❌ Passwords do not match");
+      return;
+    }
+
     setLoading(true);
 
     try {
       const response = await axios.post(
-        "http://127.0.0.1:8000/api/v1/auth/login/",
-        { username, password },
+        "http://127.0.0.1:8000/api/v1/auth/register/",
+        { username, email, password },
         { headers: { "Content-Type": "application/json" } }
       );
 
-      if (response.status === 200) {
-        localStorage.setItem("token", response.data.access);
-        localStorage.setItem("refresh", response.data.refresh);
-        alert("✅ Login successful!");
-        window.location.href = "/dashboard";
+      if (response.status === 201 || response.status === 200) {
+        alert("✅ Account created! You can now log in.");
+        window.location.href = "/";
       }
-      
     } catch (error) {
-      console.error("Login error:", error.response?.data || error.message);
-      alert("❌ Login failed. Check your credentials.");
+      console.error("Registration error:", error.response?.data || error.message);
+      alert("❌ Registration failed. Try again.");
     } finally {
       setLoading(false);
     }
@@ -49,7 +54,7 @@ function Login() {
           borderRadius: "12px",
           boxShadow: "0 8px 20px rgba(0,0,0,0.1)",
           width: "100%",
-          maxWidth: "400px",
+          maxWidth: "420px",
         }}
       >
         <h2
@@ -60,10 +65,10 @@ function Login() {
             fontWeight: "600",
           }}
         >
-          🔐 Login to EventHub
+          📝 Create an Account
         </h2>
 
-        <form onSubmit={handleLogin}>
+        <form onSubmit={handleRegister}>
           <input
             type="text"
             placeholder="Username"
@@ -81,10 +86,42 @@ function Login() {
           />
 
           <input
+            type="email"
+            placeholder="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            style={{
+              width: "100%",
+              padding: "12px",
+              marginBottom: "15px",
+              borderRadius: "6px",
+              border: "1px solid #cbd5e1",
+              fontSize: "15px",
+            }}
+          />
+
+          <input
             type="password"
             placeholder="Password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            required
+            style={{
+              width: "100%",
+              padding: "12px",
+              marginBottom: "15px",
+              borderRadius: "6px",
+              border: "1px solid #cbd5e1",
+              fontSize: "15px",
+            }}
+          />
+
+          <input
+            type="password"
+            placeholder="Confirm Password"
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
             required
             style={{
               width: "100%",
@@ -111,7 +148,7 @@ function Login() {
               fontWeight: "500",
             }}
           >
-            {loading ? "Logging in..." : "Login"}
+            {loading ? "Registering..." : "Register"}
           </button>
         </form>
 
@@ -123,12 +160,16 @@ function Login() {
             fontSize: "14px",
           }}
         >
-          Don’t have an account?{" "}
+          Already have an account?{" "}
           <a
-            href="/register"
-            style={{ color: "#3b82f6", textDecoration: "none", fontWeight: "500" }}
+            href="/"
+            style={{
+              color: "#3b82f6",
+              textDecoration: "none",
+              fontWeight: "500",
+            }}
           >
-            Register here
+            Login here
           </a>
         </p>
       </div>
@@ -136,4 +177,4 @@ function Login() {
   );
 }
 
-export default Login;
+export default Register;

@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import Login from "./pages/Login";
+import Register from "./pages/Register";
 import "./App.css";
 import Dashboard from "./pages/Dashboard";
 import AddProject from "./pages/AddProject";
@@ -16,7 +17,7 @@ function App() {
         <Route path="/edit/:id" element={<EditProject />} />
         <Route path="/projects/:id/members" element={<ProjectMembers />} />
         <Route path="/projects/:id/tasks" element={<ProjectTasks />} />
-
+        <Route path="/register" element={<Register />} />
       </Routes>
     </Router>
   );
