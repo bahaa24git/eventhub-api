@@ -161,10 +161,16 @@ function TaskCard({ task, canManage, id, onEdit, onDelete }) {
       <p style={{ margin: "5px 0", color: "#475569" }}>
         {task.description || "No description"}
       </p>
-      <p style={{ fontSize: 14, color: "#64748b" }}>
-        <strong>Status:</strong> {task.status.replace("_", " ")} |{" "}
-        <strong>Priority:</strong> {task.priority}
-      </p>
+      <p style={{ marginTop: "8px", fontSize: "14px", color: "#64748b" }}>
+                  <strong>Status:</strong>{" "}
+                  <span style={{ color: "#0ea5e9", fontWeight: 600 }}>
+                    {task.status?.replace("_", " ") || "TODO"}
+                  </span>{" "}
+                  | <strong>Priority:</strong>{" "}
+                  <span style={{ color: "#f97316", fontWeight: 600 }}>
+                    {task.priority || "LOW"}
+                  </span>
+                </p>
 
       {task.due_date && (
         <p style={{ fontSize: 13, color: "#f97316", margin: "5px 0" }}>
