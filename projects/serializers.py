@@ -77,33 +77,78 @@ class TaskSerializer(serializers.ModelSerializer):
     comments = CommentSerializer(many=True, read_only=True)
     subtasks = SubtaskSerializer(many=True, read_only=True)
 
-    # ✅ make project field injected by view (not required in request)
-    project = serializers.PrimaryKeyRelatedField(
-        queryset=Project.objects.all(),
+    # ✅ write-only IDs (frontend sends these)
+    assignee_ids = serializers.ListField(
+        child=serializers.IntegerField(),
+        write_only=True,
         required=False
     )
+    label_ids = serializers.ListField(
+        child=serializers.UUIDField(),
+        write_only=True,
+        required=False
+    )
+
+    # project is injected by the view
+    project = serializers.PrimaryKeyRelatedField(read_only=True)
 
     class Meta:
         model = Task
         fields = [
             "id", "project", "creator", "title", "description",
             "status", "priority", "due_date",
-            "assignees", "labels", "subtasks", "comments",
+            "assignees", "assignee_ids",
+            "labels", "label_ids",
+            "subtasks", "comments",
             "created_at", "updated_at", "deleted_at"
         ]
-        extra_kwargs = {
-            "project": {"read_only": True},
-            "creator": {"read_only": True},
-            "created_at": {"read_only": True},
-            "updated_at": {"read_only": True},
-            "deleted_at": {"read_only": True},
-        }
+        read_only_fields = ("project", "creator", "created_at", "updated_at", "deleted_at")
 
+    # --- labels getter (for output) ---
     def get_labels(self, obj):
-        # Fetch related labels through TaskLabel relationship
         return LabelSerializer(
-            [tl.label for tl in obj.task_labels.all()], many=True
+            [tl.label for tl in obj.task_labels.all()],
+            many=True
         ).data
+
+    # --- helper: assign users ---
+    def _set_assignees(self, task, ids):
+        TaskAssignee.objects.filter(task=task).delete()
+        if not ids:
+            return
+        users = User.objects.filter(id__in=ids)
+        TaskAssignee.objects.bulk_create(
+            [TaskAssignee(task=task, user=u) for u in users]
+        )
+
+# --- helper: assign labels ---
+    def _set_labels(self, task, label_ids):
+        TaskLabel.objects.filter(task=task).exclude(label_id__in=label_ids).delete()
+        if not label_ids:
+            return
+        labels = Label.objects.filter(id__in=label_ids)
+        for label in labels:
+            TaskLabel.objects.get_or_create(task=task, label=label)
+
+    # --- create ---
+    def create(self, validated_data):
+        assignee_ids = validated_data.pop("assignee_ids", [])
+        label_ids = validated_data.pop("label_ids", [])
+        task = super().create(validated_data)
+        self._set_assignees(task, assignee_ids)
+        self._set_labels(task, label_ids)
+        return task
+
+    # --- update ---
+    def update(self, instance, validated_data):
+        assignee_ids = validated_data.pop("assignee_ids", None)
+        label_ids = validated_data.pop("label_ids", None)
+        task = super().update(instance, validated_data)
+        if assignee_ids is not None:
+            self._set_assignees(task, assignee_ids)
+        if label_ids is not None:
+            self._set_labels(task, label_ids)
+        return task
 
 
 # --- Project ---
@@ -118,3 +163,32 @@ class ProjectSerializer(serializers.ModelSerializer):
             "created_by", "created_at", "updated_at",
             "members", "labels"
         ]
+
+
+class ProjectDashboardSerializer(serializers.Serializer):
+    project_id = serializers.UUIDField()
+    project_name = serializers.CharField()
+    total_tasks = serializers.IntegerField()
+    completed_tasks = serializers.IntegerField()
+    pending_tasks = serializers.IntegerField()
+    total_subtasks = serializers.IntegerField()
+    completed_subtasks = serializers.IntegerField()
+    members_count = serializers.IntegerField()
+    labels_count = serializers.IntegerField()
+    comments_count = serializers.IntegerField()
+    attachments_count = serializers.IntegerField()
+    last_activity = serializers.DateTimeField(allow_null=True)
+    overdue_tasks = serializers.IntegerField()
+
+    def get_overdue_tasks(self, obj):
+        today = timezone.now().date()
+        return Task.objects.filter(
+            project=obj["project_id"],
+            due_date__lt=today,
+            status__in=["TODO", "IN_PROGRESS", "BLOCKED"]
+        ).count()
+    
+
+from rest_framework import serializers
+
+

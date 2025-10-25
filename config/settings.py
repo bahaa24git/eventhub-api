@@ -8,7 +8,7 @@ import os
 from dotenv import load_dotenv
 import dj_database_url
 from corsheaders.defaults import default_headers
-
+from datetime import timedelta
 # --------------------------------------------------------------------------------------
 # Base paths & .env
 # --------------------------------------------------------------------------------------
@@ -180,6 +180,14 @@ REST_FRAMEWORK = {
     "PAGE_SIZE": 20,
 }
 
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=30),  # was 5 → now 30 minutes
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=1),
+    "ROTATE_REFRESH_TOKENS": False,
+    "BLACKLIST_AFTER_ROTATION": True,
+    "ALGORITHM": "HS256",
+    "AUTH_HEADER_TYPES": ("Bearer",),
+}
 
 SPECTACULAR_SETTINGS = {
     "TITLE": "EventHub API",

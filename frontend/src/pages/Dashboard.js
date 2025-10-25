@@ -4,6 +4,8 @@ import Layout from "../components/Layout";
 
 function Dashboard() {
   const [projects, setProjects] = useState([]);
+  const [totalProjects, setTotalProjects] = useState(0);
+  const [loading, setLoading] = useState(true);
   const token = localStorage.getItem("token");
 
   useEffect(() => {
@@ -12,7 +14,9 @@ function Dashboard() {
         const response = await axios.get("http://127.0.0.1:8000/api/v1/projects/", {
           headers: { Authorization: `Bearer ${token}` },
         });
-        setProjects(response.data.results || response.data);
+        const allProjects = response.data.results || response.data;
+        setTotalProjects(allProjects.length); // ✅ Actual total
+        setProjects(allProjects.slice(0, 3)); // ✅ Only 3 recent
       } catch (error) {
         console.error("Error fetching projects:", error);
         if (error.response?.status === 401) {
@@ -20,24 +24,12 @@ function Dashboard() {
           localStorage.removeItem("token");
           window.location.href = "/";
         }
+      } finally {
+        setLoading(false);
       }
     };
     fetchProjects();
   }, [token]);
-
-  const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this project?")) return;
-
-    try {
-      await axios.delete(`http://127.0.0.1:8000/api/v1/projects/${id}/`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setProjects(projects.filter((p) => p.id !== id));
-    } catch (error) {
-      console.error("Delete failed:", error);
-      alert("Failed to delete project");
-    }
-  };
 
   return (
     <Layout>
@@ -51,37 +43,89 @@ function Dashboard() {
           boxShadow: "0 4px 10px rgba(0,0,0,0.05)",
         }}
       >
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <h1 style={{ fontSize: "24px", color: "#1e293b", fontWeight: "600" }}>My Projects</h1>
-          <button
-            onClick={() => (window.location.href = "/add-project")}
+        <h1
+          style={{
+            fontSize: "26px",
+            color: "#1e293b",
+            fontWeight: "700",
+            marginBottom: "25px",
+          }}
+        >
+          🏠 Dashboard Overview
+        </h1>
+
+        {/* Stats Section */}
+        <div
+          style={{
+            display: "flex",
+            gap: "20px",
+            flexWrap: "wrap",
+            marginBottom: "30px",
+          }}
+        >
+          <div
             style={{
-              background: "#3b82f6",
-              color: "#fff",
-              border: "none",
-              padding: "10px 16px",
-              borderRadius: "6px",
-              cursor: "pointer",
-              fontWeight: "500",
+              flex: 1,
+              background: "#f1f5f9",
+              borderRadius: "10px",
+              padding: "20px",
+              minWidth: "200px",
+              textAlign: "center",
+              boxShadow: "0 2px 5px rgba(0,0,0,0.05)",
             }}
           >
-            + Add Project
-          </button>
+            <h3 style={{ margin: 0, color: "#64748b", fontSize: "16px" }}>
+              Total Projects
+            </h3>
+            <p
+              style={{
+                fontSize: "28px",
+                color: "#1e293b",
+                fontWeight: "700",
+                margin: "10px 0 0",
+              }}
+            >
+              {totalProjects}
+            </p>
+          </div>
+
+          <div
+            style={{
+              flex: 1,
+              background: "#f1f5f9",
+              borderRadius: "10px",
+              padding: "20px",
+              minWidth: "200px",
+              textAlign: "center",
+              boxShadow: "0 2px 5px rgba(0,0,0,0.05)",
+            }}
+          >
+            <h3 style={{ margin: 0, color: "#64748b", fontSize: "16px" }}>
+              Recent Activity
+            </h3>
+            <p
+              style={{
+                fontSize: "28px",
+                color: "#1e293b",
+                fontWeight: "700",
+                margin: "10px 0 0",
+              }}
+            >
+              {projects.length > 0 ? "Active" : "No Activity"}
+            </p>
+          </div>
         </div>
 
-        {projects.length === 0 ? (
-          <p
-            style={{
-              textAlign: "center",
-              marginTop: "40px",
-              color: "#64748b",
-              fontSize: "16px",
-            }}
-          >
-            No projects found. Start by adding one!
-          </p>
+        {/* Recent Projects */}
+        <h2 style={{ fontSize: "20px", color: "#1e293b", marginBottom: "15px" }}>
+          Recent Projects
+        </h2>
+        {loading ? (
+          <p style={{ textAlign: "center", color: "#64748b" }}>Loading...</p>
+        ) : projects.length === 0 ? (
+          <p style={{ textAlign: "center", color: "#64748b" }}>No projects yet.</p>
         ) : (
-          <ul style={{ marginTop: "25px", listStyle: "none", padding: 0 }}>
+          <ul style={{ listStyle: "none", padding: 0 }}>
             {projects.map((project) => (
               <li
                 key={project.id}
@@ -94,88 +138,57 @@ function Dashboard() {
                 }}
               >
                 <div>
-                  <h3 style={{ margin: "0 0 5px 0", color: "#1e293b" }}>{project.name}</h3>
+                  <h3
+                    style={{
+                      margin: "0 0 5px 0",
+                      color: "#1e293b",
+                      fontWeight: "600",
+                    }}
+                  >
+                    {project.name}
+                  </h3>
                   <p style={{ color: "#64748b", margin: 0 }}>
                     {project.description || "No description available."}
                   </p>
                 </div>
-
-                <div
+                <button
+                  onClick={() => 
+                    (window.location.href = `/projects/${project.id}/details`)
+                  }
                   style={{
-                    marginTop: "15px",
-                    display: "flex",
-                    flexWrap: "wrap",
-                    gap: "8px",
+                    marginTop: "10px",
+                    background: "#3b82f6",
+                    border: "none",
+                    color: "#fff",
+                    padding: "8px 12px",
+                    borderRadius: "6px",
+                    cursor: "pointer",
+                    fontSize: "14px",
                   }}
                 >
-                  <button
-                    onClick={() => (window.location.href = `/edit/${project.id}`)}
-                    style={{
-                      background: "#38bdf8",
-                      border: "none",
-                      color: "#fff",
-                      padding: "8px 12px",
-                      borderRadius: "5px",
-                      cursor: "pointer",
-                      fontSize: "14px",
-                    }}
-                  >
-                    ✏️ Edit
-                  </button>
-
-                  <button
-                    onClick={() =>
-                      (window.location.href = `/projects/${project.id}/members`)
-                    }
-                    style={{
-                      background: "#22c55e",
-                      border: "none",
-                      color: "#fff",
-                      padding: "8px 12px",
-                      borderRadius: "5px",
-                      cursor: "pointer",
-                      fontSize: "14px",
-                    }}
-                  >
-                    👥 Manage Members
-                  </button>
-
-                  <button
-                    onClick={() =>
-                      (window.location.href = `/projects/${project.id}/tasks`)
-                    }
-                    style={{
-                      background: "#f59e0b",
-                      border: "none",
-                      color: "#fff",
-                      padding: "8px 12px",
-                      borderRadius: "5px",
-                      cursor: "pointer",
-                      fontSize: "14px",
-                    }}
-                  >
-                    🧾 Manage Tasks
-                  </button>
-
-                  <button
-                    onClick={() => handleDelete(project.id)}
-                    style={{
-                      background: "#ef4444",
-                      border: "none",
-                      color: "#fff",
-                      padding: "8px 12px",
-                      borderRadius: "5px",
-                      cursor: "pointer",
-                      fontSize: "14px",
-                    }}
-                  >
-                    🗑️ Delete
-                  </button>
-                </div>
+                  View Details →
+                </button>
               </li>
             ))}
           </ul>
         )}
+
+        <div style={{ textAlign: "center", marginTop: "30px" }}>
+          <button
+            onClick={() => (window.location.href = "/projects")}
+            style={{
+              background: "#3b82f6",
+              color: "#fff",
+              border: "none",
+              padding: "10px 18px",
+              borderRadius: "6px",
+              cursor: "pointer",
+              fontWeight: "500",
+            }}
+          >
+            View All Projects →
+          </button>
+        </div>
       </div>
     </Layout>
   );

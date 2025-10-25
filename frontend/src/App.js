@@ -6,7 +6,16 @@ import Dashboard from "./pages/Dashboard";
 import AddProject from "./pages/AddProject";
 import EditProject from "./pages/EditProject";
 import ProjectMembers from "./pages/ProjectMembers";
-import ProjectTasks from "./pages/ProjectTasks";
+import ProjectTasks from "./pages/ProjectTasks";        
+import Profile from "./pages/Profile";
+import Projects from "./pages/Projects";
+import ProjectDetails from "./pages/ProjectDetails";
+import ProjectLabels from "./pages/ProjectLabels";
+import ProjectAttachments from "./pages/ProjectAttachments";
+import TaskComments from "./pages/TaskComments";
+import TaskSubtasks from "./pages/SubTasks";
+import ProjectDashboard from "./pages/ProjectDashboard";
+
 function App() {
   return (
     <Router>
@@ -18,6 +27,14 @@ function App() {
         <Route path="/projects/:id/members" element={<ProjectMembers />} />
         <Route path="/projects/:id/tasks" element={<ProjectTasks />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/profile" element={<Profile />} />
+        <Route path="/projects" element={<Projects />} />
+        <Route path="/projects/:id/details" element={<ProjectDetails />} />
+        <Route path="/projects/:id/labels" element={<ProjectLabels />} />
+        <Route path="/projects/:projectId/tasks/:taskId/attachments" element={<ProjectAttachments />} />
+        <Route path="/projects/:id/tasks/:taskId/comments" element={<TaskComments />} />
+        <Route path="/projects/:id/tasks/:taskId/subtasks" element={<TaskSubtasks />} />
+        <Route path="/projects/:id/dashboard" element={<ProjectDashboard />} />
       </Routes>
     </Router>
   );

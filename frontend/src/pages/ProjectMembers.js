@@ -7,27 +7,44 @@ function ProjectMembers() {
   const token = localStorage.getItem("token");
 
   const [members, setMembers] = useState([]);
-  const [role, setRole] = useState("MEMBER");
+  const [role, setRole] = useState("VIEWER"); // current user role
+  const [addRole, setAddRole] = useState("MEMBER");
   const [search, setSearch] = useState("");
   const [users, setUsers] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef();
 
-  // fetch current project members
+  // ✅ Fetch project members and detect current user's role
   useEffect(() => {
-    const fetchMembers = async () => {
+    const fetchMembersAndRole = async () => {
       try {
+        // decode token
+        let decoded = {};
+        try {
+          decoded = JSON.parse(atob(token.split(".")[1]));
+        } catch {
+          console.warn("❌ Failed to decode token");
+        }
+        const userId = decoded.user_id || decoded.id || decoded.sub || null;
+
         const res = await axios.get(
           `http://127.0.0.1:8000/api/v1/projects/${id}/members/`,
           { headers: { Authorization: `Bearer ${token}` } }
         );
-        setMembers(res.data.results || res.data);
+        const allMembers = res.data.results || res.data;
+        setMembers(allMembers);
+
+        // find current user role
+        const myMember = allMembers.find(
+          (m) => String(m.user.id) === String(userId)
+        );
+        setRole(myMember ? myMember.role : "VIEWER");
       } catch (err) {
         console.error("Error fetching members:", err);
       }
     };
-    fetchMembers();
+    fetchMembersAndRole();
   }, [id, token]);
 
   // click outside → close dropdown
@@ -41,7 +58,7 @@ function ProjectMembers() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // live search
+  // live search for users
   const handleSearch = async (e) => {
     const value = e.target.value;
     setSearch(value);
@@ -60,14 +77,14 @@ function ProjectMembers() {
     }
   };
 
-  // add member
+  // add member (Admin/Owner only)
   const handleAddMember = async (e) => {
     e.preventDefault();
     if (!selectedUser) return alert("Please select a user first!");
     try {
       await axios.post(
         `http://127.0.0.1:8000/api/v1/projects/${id}/members/`,
-        { user: selectedUser.id, role },
+        { user: selectedUser.id, role: addRole },
         { headers: { Authorization: `Bearer ${token}` } }
       );
       alert("✅ Member added!");
@@ -85,7 +102,7 @@ function ProjectMembers() {
     }
   };
 
-  // remove member
+  // remove member (Admin/Owner only)
   const handleRemove = async (memberId) => {
     if (!window.confirm("Remove this member?")) return;
     try {
@@ -98,45 +115,48 @@ function ProjectMembers() {
       console.error("Remove failed:", err);
     }
   };
-// ✅ role-based gradient styles (Discord look)
-const getRoleStyle = (role) => {
-  switch (role) {
-    case "OWNER":
-      return {
-        background: "linear-gradient(135deg, #fef3c7, #fde68a)",
-        color: "#78350f",
-        boxShadow: "0 2px 5px rgba(250, 204, 21, 0.3)",
-        transition: "all 0.25s ease-in-out",
-      };
-    case "ADMIN":
-      return {
-        background: "linear-gradient(135deg, #dbeafe, #93c5fd)",
-        color: "#1e3a8a",
-        boxShadow: "0 2px 5px rgba(59,130,246,0.3)",
-        transition: "all 0.25s ease-in-out",
-      };
-    case "MEMBER":
-      return {
-        background: "linear-gradient(135deg, #dcfce7, #86efac)",
-        color: "#065f46",
-        boxShadow: "0 2px 5px rgba(34,197,94,0.3)",
-        transition: "all 0.25s ease-in-out",
-      };
-    case "VIEWER":
-      return {
-        background: "linear-gradient(135deg, #f3f4f6, #e5e7eb)",
-        color: "#374151",
-        boxShadow: "0 2px 5px rgba(156,163,175,0.3)",
-        transition: "all 0.25s ease-in-out",
-      };
-    default:
-      return {
-        background: "#f3f4f6",
-        color: "#374151",
-        transition: "all 0.25s ease-in-out",
-      };
-  }
-};
+
+  const canManage = role === "OWNER" || role === "ADMIN";
+
+  // role-based style
+  const getRoleStyle = (role) => {
+    switch (role) {
+      case "OWNER":
+        return {
+          background: "linear-gradient(135deg, #fef3c7, #fde68a)",
+          color: "#78350f",
+          boxShadow: "0 2px 5px rgba(250, 204, 21, 0.3)",
+          transition: "all 0.25s ease-in-out",
+        };
+      case "ADMIN":
+        return {
+          background: "linear-gradient(135deg, #dbeafe, #93c5fd)",
+          color: "#1e3a8a",
+          boxShadow: "0 2px 5px rgba(59,130,246,0.3)",
+          transition: "all 0.25s ease-in-out",
+        };
+      case "MEMBER":
+        return {
+          background: "linear-gradient(135deg, #dcfce7, #86efac)",
+          color: "#065f46",
+          boxShadow: "0 2px 5px rgba(34,197,94,0.3)",
+          transition: "all 0.25s ease-in-out",
+        };
+      case "VIEWER":
+        return {
+          background: "linear-gradient(135deg, #f3f4f6, #e5e7eb)",
+          color: "#374151",
+          boxShadow: "0 2px 5px rgba(156,163,175,0.3)",
+          transition: "all 0.25s ease-in-out",
+        };
+      default:
+        return {
+          background: "#f3f4f6",
+          color: "#374151",
+        };
+    }
+  };
+
   return (
     <div
       style={{
@@ -160,109 +180,115 @@ const getRoleStyle = (role) => {
         👥 Project Members
       </h1>
 
-      {/* add member */}
-      <form
-        onSubmit={handleAddMember}
-        ref={dropdownRef}
-        style={{ position: "relative", marginBottom: "25px" }}
-      >
-        <input
-          type="text"
-          placeholder="Search username..."
-          value={selectedUser ? selectedUser.username : search}
-          onChange={handleSearch}
-          onFocus={() => setShowDropdown(true)}
-          style={{
-            width: "100%",
-            padding: "12px",
-            borderRadius: "6px",
-            border: "1px solid #cbd5e1",
-            fontSize: "15px",
-            marginBottom: "10px",
-          }}
-        />
+      <p style={{ textAlign: "center", color: "#64748b", marginBottom: "20px" }}>
+        <strong>Your Role:</strong> {role}
+      </p>
 
-        {showDropdown && users.length > 0 && (
-          <ul
+      {/* Add member (Only for Admin/Owner) */}
+      {canManage && (
+        <form
+          onSubmit={handleAddMember}
+          ref={dropdownRef}
+          style={{ position: "relative", marginBottom: "25px" }}
+        >
+          <input
+            type="text"
+            placeholder="Search username..."
+            value={selectedUser ? selectedUser.username : search}
+            onChange={handleSearch}
+            onFocus={() => setShowDropdown(true)}
             style={{
-              position: "absolute",
-              top: "48px",
-              left: 0,
-              right: 0,
-              background: "#fff",
-              listStyle: "none",
-              padding: 0,
+              width: "100%",
+              padding: "12px",
               borderRadius: "6px",
-              border: "1px solid #e2e8f0",
-              boxShadow: "0 4px 10px rgba(0,0,0,0.1)",
-              zIndex: 20,
-              maxHeight: "200px",
-              overflowY: "auto",
+              border: "1px solid #cbd5e1",
+              fontSize: "15px",
+              marginBottom: "10px",
+            }}
+          />
+
+          {showDropdown && users.length > 0 && (
+            <ul
+              style={{
+                position: "absolute",
+                top: "48px",
+                left: 0,
+                right: 0,
+                background: "#fff",
+                listStyle: "none",
+                padding: 0,
+                borderRadius: "6px",
+                border: "1px solid #e2e8f0",
+                boxShadow: "0 4px 10px rgba(0,0,0,0.1)",
+                zIndex: 20,
+                maxHeight: "200px",
+                overflowY: "auto",
+              }}
+            >
+              {users.map((u) => (
+                <li
+                  key={u.id}
+                  onClick={() => {
+                    setSelectedUser(u);
+                    setSearch(u.username);
+                    setShowDropdown(false);
+                  }}
+                  style={{
+                    padding: "10px 15px",
+                    borderBottom: "1px solid #f1f5f9",
+                    cursor: "pointer",
+                  }}
+                  onMouseEnter={(e) => (e.target.style.background = "#f1f5f9")}
+                  onMouseLeave={(e) => (e.target.style.background = "#fff")}
+                >
+                  <strong>{u.username}</strong>{" "}
+                  <span style={{ color: "#64748b", fontSize: "0.85rem" }}>
+                    ({u.email})
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+
+          <select
+            value={addRole}
+            onChange={(e) => setAddRole(e.target.value)}
+            style={{
+              width: "100%",
+              padding: "10px",
+              borderRadius: "6px",
+              border: "1px solid #cbd5e1",
+              fontSize: "15px",
+              marginTop: "8px",
+              marginBottom: "12px",
             }}
           >
-            {users.map((u) => (
-              <li
-                key={u.id}
-                onClick={() => {
-                  setSelectedUser(u);
-                  setSearch(u.username);
-                  setShowDropdown(false);
-                }}
-                style={{
-                  padding: "10px 15px",
-                  borderBottom: "1px solid #f1f5f9",
-                  cursor: "pointer",
-                }}
-                onMouseEnter={(e) => (e.target.style.background = "#f1f5f9")}
-                onMouseLeave={(e) => (e.target.style.background = "#fff")}
-              >
-                <strong>{u.username}</strong>{" "}
-                <span style={{ color: "#64748b", fontSize: "0.85rem" }}>
-                  ({u.email})
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
+            <option value="OWNER">Owner</option>
+            <option value="ADMIN">Admin</option>
+            <option value="MEMBER">Member</option>
+            <option value="VIEWER">Viewer</option>
+          </select>
 
-        <select
-          value={role}
-          onChange={(e) => setRole(e.target.value)}
-          style={{
-            width: "100%",
-            padding: "10px",
-            borderRadius: "6px",
-            border: "1px solid #cbd5e1",
-            fontSize: "15px",
-            marginTop: "8px",
-            marginBottom: "12px",
-          }}
-        >
-          <option value="OWNER">Owner</option>
-          <option value="ADMIN">Admin</option>
-          <option value="MEMBER">Member</option>
-          <option value="VIEWER">Viewer</option>
-        </select>
+          <button
+            type="submit"
+            style={{
+              width: "100%",
+              padding: "12px",
+              background: "#3b82f6",
+              color: "#fff",
+              border: "none",
+              borderRadius: "6px",
+              fontSize: "16px",
+              cursor: "pointer",
+              fontWeight: "500",
+            }}
+          >
+            ➕ Add Member
+          </button>
+        </form>
+      )}
 
-        <button
-          type="submit"
-          style={{
-            width: "100%",
-            padding: "12px",
-            background: "#3b82f6",
-            color: "#fff",
-            border: "none",
-            borderRadius: "6px",
-            fontSize: "16px",
-            cursor: "pointer",
-            fontWeight: "500",
-          }}
-        >
-          ➕ Add Member
-        </button>
-      </form>
-
-      {/* members list */}
+      {/* Members list */}
       {members.length === 0 ? (
         <p style={{ textAlign: "center", color: "#64748b" }}>No members yet.</p>
       ) : (
@@ -285,48 +311,43 @@ const getRoleStyle = (role) => {
                 <h3 style={{ margin: "0 0 5px", color: "#1e293b" }}>
                   {m.user.username}
                 </h3>
-<div
-  style={{
-    ...getRoleStyle(m.role),
-    display: "inline-block",
-    padding: "6px 14px",
-    borderRadius: "9999px",
-    fontSize: "13px",
-    fontWeight: "600",
-    marginTop: "6px",
-    transform: "translateY(0)",
-  }}
-  onMouseEnter={(e) => {
-    e.currentTarget.style.transform = "translateY(-2px) scale(1.05)";
-    e.currentTarget.style.boxShadow = "0 4px 10px rgba(0,0,0,0.15)";
-  }}
-  onMouseLeave={(e) => {
-    e.currentTarget.style.transform = "translateY(0)";
-    e.currentTarget.style.boxShadow = getRoleStyle(m.role).boxShadow;
-  }}
->
-  {m.role}
-</div>
+                <div
+                  style={{
+                    ...getRoleStyle(m.role),
+                    display: "inline-block",
+                    padding: "6px 14px",
+                    borderRadius: "9999px",
+                    fontSize: "13px",
+                    fontWeight: "600",
+                    marginTop: "6px",
+                    transform: "translateY(0)",
+                  }}
+                >
+                  {m.role}
+                </div>
                 <p
                   style={{ margin: "0", color: "#94a3b8", fontSize: "0.85rem" }}
                 >
                   Joined {new Date(m.joined_at).toLocaleDateString()}
                 </p>
               </div>
-              <button
-                onClick={() => handleRemove(m.id)}
-                style={{
-                  background: "#ef4444",
-                  color: "#fff",
-                  border: "none",
-                  borderRadius: "6px",
-                  padding: "8px 12px",
-                  cursor: "pointer",
-                  fontSize: "14px",
-                }}
-              >
-                Remove
-              </button>
+
+              {canManage && (
+                <button
+                  onClick={() => handleRemove(m.id)}
+                  style={{
+                    background: "#ef4444",
+                    color: "#fff",
+                    border: "none",
+                    borderRadius: "6px",
+                    padding: "8px 12px",
+                    cursor: "pointer",
+                    fontSize: "14px",
+                  }}
+                >
+                  Remove
+                </button>
+              )}
             </li>
           ))}
         </ul>

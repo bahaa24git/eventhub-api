@@ -1,6 +1,7 @@
-# EventHub API (Django + DRF)
+# EventHub – Projects & Tasks API (Django + DRF)
 
-A backend Event Management API for creating, updating, deleting, and viewing **upcoming events** with auth, capacity rules, filters, and pagination.
+A backend API for **project collaboration**: Projects, Members (roles), Tasks with status/priority, Labels, Comments, Attachments, and Subtasks.  
+JWT authentication, search/filtering, pagination, and OpenAPI docs included.
 
 ---
 
@@ -9,82 +10,225 @@ A backend Event Management API for creating, updating, deleting, and viewing **u
 - Week 1: ✅ Repo + project skeleton  
 - Week 2: ✅ Models, Migrations, Admin setup  
 - Week 3: ✅ CRUD endpoints (Projects, Tasks, Labels)  
-- Week 4: ✅ Authentication + Members + Attachments + Comments  
-- Week 5: 🚧 Testing + Documentation + Final polish  
+- Week 4: ✅ Auth + Members + Attachments + Comments  
+- Week 5: 🚧 UI polish / Docs / Final review
 
 ---
 
 ## 🧠 Features (MVP)
 
-- 🔐 **JWT Auth** (Register, Login, Refresh)
-- 🧩 **Projects CRUD**
-- 👥 **Members** with role-based access (Owner, Admin, Member, Viewer)
-- 🏷️ **Labels** for project tasks
-- 📋 **Tasks CRUD** with status, priority, and due dates
-- ✅ **Subtasks, Comments, and Attachments**
-- 🗑️ Soft Delete for Tasks
-- ⚙️ Filtering, Search, and Ordering for Tasks
-- 📄 Auto-generated API Docs with **drf-spectacular**
-- 🌍 CORS + Pagination + Clean error handling
+- 🔐 **JWT Auth** (Login, Refresh) — Access token lifetime: **30 minutes**
+- 👤 **Profile** (phone, timezone, avatar URL) for authenticated user
+- 📁 **Projects CRUD** (+ archive flag)
+- 👥 **Members** with roles: Owner / Admin / Member / Viewer
+- 🧾 **Tasks** (CRUD) with status, priority, due date, soft-delete
+- ✅ **Subtasks**, 💬 **Comments**, 📎 **Attachments**
+- 🏷️ **Labels** (project-scoped, unique by name)
+- 🔎 **Search / Filtering / Ordering** for tasks
+- 📄 **OpenAPI/Swagger** with drf-spectacular
+- 🌍 CORS, pagination, clean error responses
 
 ---
 
 ## 🧰 Tech Stack
 
-- Django 5  
-- Django REST Framework  
-- drf-spectacular (OpenAPI / Swagger)  
-- django-cors-headers  
-- python-dotenv  
+- Django 5
+- Django REST Framework
+- SimpleJWT (JWT)
+- drf-spectacular (OpenAPI/Swagger)
+- django-cors-headers
+- python-dotenv
+- dj-database-url, WhiteNoise
+
 ---
 
 ## ⚡ Quickstart
 
-Clone and set up your local environment:
-
 ```bash
+# 1) Create venv & install deps
 python -m venv .venv
-# Windows: . .venv/Scripts/activate
-# macOS/Linux: source .venv/bin/activate
+# Windows
+. .venv/Scripts/activate
+# macOS/Linux
+# source .venv/bin/activate
+
 pip install -r requirements.txt
+
+# 2) Environment
+# Create .env in repo root:
+# DEBUG=True
+# SECRET_KEY=dev-secret-change
+# DATABASE_URL=sqlite:///db.sqlite3
+# ALLOWED_HOSTS=localhost,127.0.0.1
+
+# 3) Migrate & run
 python manage.py migrate
+# (optional) create admin
+python manage.py createsuperuser
+
 python manage.py runserver
-```
 
-Create `.env` in the project root:
-```
-DEBUG=True
-SECRET_KEY=dev-secret-change
-DATABASE_URL=sqlite:///db.sqlite3
-ALLOWED_HOSTS=localhost,127.0.0.1
-```
+Media Files (Attachments)
 
-Useful URLs (dev):
-- Swagger UI: `/api/docs/`
-- OpenAPI JSON: `/api/schema/`
-- Health check: `/health/`
-- Admin: `/admin/` (optional `python manage.py createsuperuser`)
+During development, Django serves uploaded media (task attachments) directly (safe for ALX review):
 
-## Project layout
-```
-config/           # Django project (settings/urls/asgi/wsgi)
-events/           # app: events (Week 2: models/serializers/views)
-users/            # app: users  (auth/permissions later)
-docs/             # extra docs (optional)
+# config/settings.py
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
+
+# config/urls.py
+from django.conf import settings
+from django.conf.urls.static import static
+
+urlpatterns = [
+    # ... your routes (admin, api, docs, etc.)
+]
+
+if settings.DEBUG:  # development only
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
+Now uploaded files will be accessible at URLs like:
+
+http://127.0.0.1:8000/media/attachments/2025/10/24/your_file.jpg
+
+> Production note: In production, serve media via Nginx or cloud storage (e.g., AWS S3). Django should not serve media in production.
+
+
+
+
+---
+
+🔑 Authentication
+
+POST /api/v1/auth/login/ → { access, refresh }
+
+POST /api/v1/auth/refresh/ → new access token
+
+GET /api/v1/auth/me/ → current user
+
+GET/PUT/PATCH /api/v1/auth/profile/ → update your profile (phone, timezone, avatar_url)
+
+GET /api/v1/auth/users/ → list/search users (used for member search)
+
+
+> Access tokens last 30 minutes (see SIMPLE_JWT in settings).
+
+
+
+
+---
+
+📚 API Highlights
+
+Projects
+
+GET /api/v1/projects/
+
+POST /api/v1/projects/
+
+GET/PUT/PATCH/DELETE /api/v1/projects/{id}/
+
+
+Members
+
+GET/POST /api/v1/projects/{project_pk}/members/
+
+GET/PUT/PATCH/DELETE /api/v1/projects/{project_pk}/members/{id}/
+
+
+Labels
+
+GET/POST /api/v1/projects/{project_pk}/labels/
+
+GET/PUT/PATCH/DELETE /api/v1/projects/{project_pk}/labels/{id}/
+
+
+Tasks
+
+GET/POST /api/v1/projects/{project_pk}/tasks/
+
+GET/PUT/PATCH/DELETE /api/v1/projects/{project_pk}/tasks/{id}/
+
+Filters: ?status=...&assignee=...&label=...&due_before=...
+
+Search: ?search=...
+
+Ordering: ?ordering=priority or -due_date
+
+
+Subtasks
+
+GET/POST /api/v1/projects/{project_pk}/tasks/{task_pk}/subtasks/
+
+
+Comments
+
+GET/POST /api/v1/projects/{project_pk}/tasks/{task_pk}/comments/
+
+
+Attachments
+
+GET/POST /api/v1/projects/{project_pk}/tasks/{task_pk}/attachments/
+
+
+
+---
+
+📘 API Docs
+
+Swagger UI: /api/docs/
+
+OpenAPI JSON: /api/schema/
+
+
+
+---
+
+🗂 Project Layout
+
+config/               # Django project (settings/urls/asgi/wsgi)
+projects/             # Projects, Members, Tasks, Labels, Attachments, Comments
+accounts/             # Profile model + endpoints
+users/                # Auth helpers / user listing (if used)
+frontend/             # React app (optional, if included)
+media/                # Uploaded files (created at runtime)
 requirements.txt
 manage.py
 README.md
-LICENSE
-```
 
-## Roadmap (5 weeks)
-- **W1:** Plan + skeleton (this repo)
-- **W2:** Events CRUD + ownership + validations
-- **W3:** Auth (JWT optional) + upcoming list + pagination/filters
-- **W4:** Capacity & (optional) waitlist + docs
-- **W5:** Deploy (PythonAnywhere) + demo video
 
-## License
-MIT — see `LICENSE`.
+---
 
-# eventhub-api
+🧪 Notes for Reviewers (ALX)
+
+Attachments are served via /media/... in DEBUG mode (dev-only).
+
+CORS is enabled for http://localhost:3000.
+
+JWT access token lifetime is 30 minutes for smoother testing.
+
+Frontend stores tokens in localStorage and calls the API with Authorization: Bearer <token>.
+
+
+
+---
+
+🛣️ Roadmap
+
+UI/UX final polish (cards, toasts, role colors)
+
+Task board view (optional)
+
+Production media via S3 (optional)
+
+Tests (pytest + DRF test client)
+
+
+
+---
+
+📄 License
+
+MIT — see LICENSE.
+
+---
