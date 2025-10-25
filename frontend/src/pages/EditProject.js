@@ -117,7 +117,7 @@ function EditProject() {
 
             <button
               type="button"
-              onClick={() => (window.location.href = "/dashboard")}
+              onClick={() => (window.location.href = `/projects/${id}/details`)}
               style={{
                 flex: 1,
                 background: "#e2e8f0",

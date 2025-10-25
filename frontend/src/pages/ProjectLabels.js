@@ -3,19 +3,20 @@ import { useParams } from "react-router-dom";
 import axios from "axios";
 import Layout from "../components/Layout";
 
-function ProjectLabels() {
-  const { id } = useParams(); // project id
+const API = "http://127.0.0.1:8000/api/v1";
+
+export default function ProjectLabels() {
+  const { id } = useParams();
   const token = localStorage.getItem("token");
+  const headers = { Authorization: `Bearer ${token}` };
 
   const [labels, setLabels] = useState([]);
-  const [name, setName] = useState("");
-  const [color, setColor] = useState("#3b82f6");
-  const [loading, setLoading] = useState(true);
-  const [selectedPreset, setSelectedPreset] = useState(null);
+  const [form, setForm] = useState({ name: "", color: "#3b82f6" });
   const [role, setRole] = useState("VIEWER");
+  const [loading, setLoading] = useState(true);
+  const [selected, setSelected] = useState(null);
 
-  // 🔹 Preset Labels
-  const presetLabels = [
+  const presets = [
     { name: "Bug", color: "#ef4444" },
     { name: "Urgent", color: "#f59e0b" },
     { name: "Research", color: "#3b82f6" },
@@ -24,189 +25,120 @@ function ProjectLabels() {
     { name: "Backend", color: "#6366f1" },
   ];
 
-  // ✅ Fetch project + determine role
-  useEffect(() => {
-    const fetchRoleAndLabels = async () => {
-      try {
-        // decode token → get user ID
-        let decoded = {};
-        try {
-          decoded = JSON.parse(atob(token.split(".")[1]));
-        } catch {
-          console.warn("❌ Failed to decode token");
-        }
-        const userId = decoded.user_id || decoded.id || decoded.sub || null;
+  const canModify = ["OWNER", "ADMIN"].includes(role);
 
-        // fetch project details (members)
-        const projectRes = await axios.get(
-          `http://127.0.0.1:8000/api/v1/projects/${id}/`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        const project = projectRes.data;
-        const me = project.members?.find(
+  // 🔹 Fetch role + labels
+  useEffect(() => {
+    (async () => {
+      try {
+        const decoded = JSON.parse(atob(token.split(".")[1]));
+        const userId = decoded.user_id || decoded.id;
+
+        const proj = await axios.get(`${API}/projects/${id}/`, { headers });
+        const me = proj.data.members?.find(
           (m) => String(m.user.id) === String(userId)
         );
         setRole(me ? me.role : "VIEWER");
 
-        // fetch labels
-        const labelRes = await axios.get(
-          `http://127.0.0.1:8000/api/v1/projects/${id}/labels/`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        setLabels(labelRes.data.results || labelRes.data);
-      } catch (err) {
-        console.error("Error loading data:", err);
-        alert("Failed to load labels or role.");
+        const res = await axios.get(`${API}/projects/${id}/labels/`, { headers });
+        setLabels(res.data.results || res.data);
+      } catch {
+        alert("❌ Failed to load project data");
       } finally {
         setLoading(false);
       }
-    };
-    fetchRoleAndLabels();
+    })();
   }, [id, token]);
 
-  const canModify = role !== "VIEWER" && role !== "MEMBER";
-
-  // ✅ Add new label
-  const handleAddLabel = async (e) => {
+  // 🔹 Create Label
+  const handleAdd = async (e) => {
     e.preventDefault();
-    if (!canModify) return alert("You do not have permission to add labels.");
-    const finalName = name.trim();
-    if (!finalName) return alert("Please enter a label name.");
+    if (!canModify || !form.name.trim()) return;
     try {
       const res = await axios.post(
-        `http://127.0.0.1:8000/api/v1/projects/${id}/labels/`,
-        { name: finalName, color_hex: color },
-        { headers: { Authorization: `Bearer ${token}` } }
+        `${API}/projects/${id}/labels/`,
+        { name: form.name, color_hex: form.color },
+        { headers }
       );
       setLabels([...labels, res.data]);
-      setName("");
-      setColor("#3b82f6");
-      setSelectedPreset(null);
-    } catch (err) {
-      console.error("Error creating label:", err);
-      alert("Failed to create label.");
+      setForm({ name: "", color: "#3b82f6" });
+      setSelected(null);
+    } catch {
+      alert("❌ Failed to create label");
     }
   };
 
-  // ✅ Delete label
-  const handleDelete = async (labelId) => {
-    if (!canModify) return alert("You do not have permission to delete labels.");
-    if (!window.confirm("Are you sure you want to delete this label?")) return;
-    try {
-      await axios.delete(
-        `http://127.0.0.1:8000/api/v1/projects/${id}/labels/${labelId}/`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      setLabels(labels.filter((l) => l.id !== labelId));
-    } catch (err) {
-      console.error("Error deleting label:", err);
-      alert("Failed to delete label.");
-    }
-  };
-
-  const handlePresetClick = (preset) => {
-    setName(preset.name);
-    setColor(preset.color);
-    setSelectedPreset(preset.name);
+  // 🔹 Delete Label
+  const handleDelete = async (lid) => {
+    if (!canModify || !window.confirm("Delete this label?")) return;
+    await axios.delete(`${API}/projects/${id}/labels/${lid}/`, { headers });
+    setLabels(labels.filter((l) => l.id !== lid));
   };
 
   return (
     <Layout>
       <div
         style={{
-          maxWidth: "900px",
-          margin: "auto",
+          maxWidth: 800,
+          margin: "40px auto",
           background: "#fff",
-          padding: "35px",
-          borderRadius: "12px",
-          boxShadow: "0 4px 10px rgba(0,0,0,0.05)",
+          borderRadius: 12,
+          padding: 30,
+          boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
         }}
       >
-        <h1 style={{ fontSize: "26px", color: "#1e293b", fontWeight: "700" }}>
-          🏷 {canModify ? "Manage Labels" : "Project Labels"}
-        </h1>
-        <p style={{ color: "#94a3b8", marginBottom: "15px" }}>
+        <h1 style={{ color: "#1e293b", textAlign: "center" }}>🏷 Project Labels</h1>
+        <p style={{ textAlign: "center", color: "#64748b" }}>
           <strong>Your Role:</strong> {role}
         </p>
 
-        {/* Presets */}
-        <div style={{ marginTop: "20px" }}>
-          <h3 style={{ fontSize: "16px", color: "#475569", marginBottom: "10px" }}>
-            Quick Presets
-          </h3>
-          <div
-            style={{
-              display: "flex",
-              flexWrap: "wrap",
-              gap: "10px",
-              marginBottom: "20px",
-            }}
-          >
-            {presetLabels.map((preset) => (
-              <button
-                key={preset.name}
-                onClick={() => canModify && handlePresetClick(preset)}
-                style={{
-                  background: preset.color,
-                  color: "#fff",
-                  border: selectedPreset === preset.name ? "2px solid #1e293b" : "none",
-                  borderRadius: "8px",
-                  padding: "8px 12px",
-                  cursor: canModify ? "pointer" : "not-allowed",
-                  fontWeight: "500",
-                  boxShadow: "0 2px 5px rgba(0,0,0,0.15)",
-                  opacity: canModify ? 1 : 0.6,
-                }}
-                disabled={!canModify}
-              >
-                {preset.name}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Add Form */}
-        {canModify && (
-          <form
-            onSubmit={handleAddLabel}
-            style={{
-              marginTop: "10px",
-              display: "flex",
-              gap: "10px",
-              flexWrap: "wrap",
-              alignItems: "center",
-            }}
-          >
-            <input
-              type="text"
-              placeholder="Label name..."
-              value={name}
-              onChange={(e) => {
-                setName(e.target.value);
-                setSelectedPreset(null);
+        {/* Preset Buttons */}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 10, margin: "20px 0" }}>
+          {presets.map((p) => (
+            <button
+              key={p.name}
+              disabled={!canModify}
+              onClick={() => {
+                setForm(p);
+                setSelected(p.name);
               }}
               style={{
+                background: p.color,
+                color: "#fff",
+                padding: "8px 12px",
+                borderRadius: 8,
+                border: selected === p.name ? "2px solid #1e293b" : "none",
+                opacity: canModify ? 1 : 0.5,
+                cursor: canModify ? "pointer" : "not-allowed",
+              }}
+            >
+              {p.name}
+            </button>
+          ))}
+        </div>
+
+        {/* Add Label Form */}
+        {canModify && (
+          <form
+            onSubmit={handleAdd}
+            style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 20 }}
+          >
+            <input
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              placeholder="Label name..."
+              style={{
                 flex: 1,
-                padding: "10px",
-                borderRadius: "6px",
+                padding: 10,
+                borderRadius: 6,
                 border: "1px solid #cbd5e1",
-                fontSize: "15px",
               }}
             />
             <input
               type="color"
-              value={color}
-              onChange={(e) => {
-                setColor(e.target.value);
-                setSelectedPreset(null);
-              }}
-              style={{
-                width: "50px",
-                height: "40px",
-                border: "1px solid #cbd5e1",
-                borderRadius: "6px",
-                cursor: "pointer",
-              }}
+              value={form.color}
+              onChange={(e) => setForm({ ...form, color: e.target.value })}
+              style={{ width: 50, height: 40, border: "1px solid #cbd5e1" }}
             />
             <button
               type="submit"
@@ -214,67 +146,54 @@ function ProjectLabels() {
                 background: "#3b82f6",
                 color: "#fff",
                 border: "none",
+                borderRadius: 6,
                 padding: "10px 15px",
-                borderRadius: "6px",
                 cursor: "pointer",
-                fontWeight: "500",
               }}
             >
-              + Add Label
+              + Add
             </button>
           </form>
         )}
 
         {/* Labels */}
         {loading ? (
-          <p style={{ textAlign: "center", marginTop: "30px" }}>Loading...</p>
+          <p style={{ textAlign: "center" }}>Loading...</p>
         ) : labels.length === 0 ? (
-          <p
-            style={{
-              textAlign: "center",
-              color: "#64748b",
-              marginTop: "30px",
-            }}
-          >
-            No labels yet.
-          </p>
+          <p style={{ textAlign: "center", color: "#64748b" }}>No labels yet.</p>
         ) : (
           <ul
             style={{
               listStyle: "none",
               padding: 0,
-              marginTop: "30px",
               display: "flex",
               flexWrap: "wrap",
-              gap: "10px",
+              gap: 10,
             }}
           >
-            {labels.map((label) => (
+            {labels.map((l) => (
               <li
-                key={label.id}
+                key={l.id}
                 style={{
-                  background: label.color_hex || "#e2e8f0",
-                  color: "#1e293b",
-                  padding: "10px 15px",
-                  borderRadius: "8px",
-                  boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
+                  background: l.color_hex,
+                  color: "#fff",
+                  padding: "8px 12px",
+                  borderRadius: 8,
                   display: "flex",
                   alignItems: "center",
-                  gap: "10px",
+                  gap: 8,
                 }}
               >
-                <span style={{ fontWeight: "500" }}>{label.name}</span>
+                {l.name}
                 {canModify && (
                   <button
-                    onClick={() => handleDelete(label.id)}
+                    onClick={() => handleDelete(l.id)}
                     style={{
-                      background: "rgba(0,0,0,0.15)",
+                      background: "rgba(0,0,0,0.2)",
                       color: "#fff",
                       border: "none",
-                      borderRadius: "5px",
-                      padding: "4px 8px",
+                      borderRadius: 4,
                       cursor: "pointer",
-                      fontSize: "13px",
                     }}
                   >
                     ✖
@@ -285,25 +204,22 @@ function ProjectLabels() {
           </ul>
         )}
 
-        {/* Back */}
         <button
-          onClick={() => (window.location.href = "/dashboard")}
+          onClick={() => (window.location.href = `/projects/${id}/details`)}
           style={{
             display: "block",
-            margin: "25px auto 0",
-            background: "#94a3b8",
+            margin: "30px auto 0",
+            background: "#64748b",
             color: "#fff",
             border: "none",
-            borderRadius: "6px",
+            borderRadius: 6,
             padding: "10px 20px",
             cursor: "pointer",
           }}
         >
-          ← Back to Dashboard
+          ← Back to Project
         </button>
       </div>
     </Layout>
   );
-}
-
-export default ProjectLabels;
+}   

@@ -2,194 +2,117 @@ import React, { useEffect, useState, useRef } from "react";
 import { useParams } from "react-router-dom";
 import axios from "axios";
 
-function ProjectMembers() {
+const API = "http://127.0.0.1:8000/api/v1";
+
+export default function ProjectMembers() {
   const { id } = useParams();
   const token = localStorage.getItem("token");
+  const headers = { Authorization: `Bearer ${token}` };
 
   const [members, setMembers] = useState([]);
-  const [role, setRole] = useState("VIEWER"); // current user role
-  const [addRole, setAddRole] = useState("MEMBER");
-  const [search, setSearch] = useState("");
   const [users, setUsers] = useState([]);
+  const [search, setSearch] = useState("");
+  const [role, setRole] = useState("VIEWER");
+  const [addRole, setAddRole] = useState("MEMBER");
   const [selectedUser, setSelectedUser] = useState(null);
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef();
 
-  // ✅ Fetch project members and detect current user's role
+  const canManage = ["OWNER", "ADMIN"].includes(role);
+
+  // 🔹 Fetch members + role
   useEffect(() => {
-    const fetchMembersAndRole = async () => {
+    (async () => {
       try {
-        // decode token
-        let decoded = {};
-        try {
-          decoded = JSON.parse(atob(token.split(".")[1]));
-        } catch {
-          console.warn("❌ Failed to decode token");
-        }
-        const userId = decoded.user_id || decoded.id || decoded.sub || null;
-
-        const res = await axios.get(
-          `http://127.0.0.1:8000/api/v1/projects/${id}/members/`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        const allMembers = res.data.results || res.data;
-        setMembers(allMembers);
-
-        // find current user role
-        const myMember = allMembers.find(
-          (m) => String(m.user.id) === String(userId)
-        );
-        setRole(myMember ? myMember.role : "VIEWER");
-      } catch (err) {
-        console.error("Error fetching members:", err);
+        const decoded = JSON.parse(atob(token.split(".")[1]));
+        const userId = decoded.user_id || decoded.id;
+        const res = await axios.get(`${API}/projects/${id}/members/`, { headers });
+        const list = res.data.results || res.data;
+        setMembers(list);
+        const me = list.find((m) => String(m.user.id) === String(userId));
+        setRole(me ? me.role : "VIEWER");
+      } catch {
+        alert("Failed to load members");
       }
-    };
-    fetchMembersAndRole();
+    })();
   }, [id, token]);
 
-  // click outside → close dropdown
+  // 🔹 Close dropdown when clicking outside
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setShowDropdown(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    const handleClick = (e) =>
+      dropdownRef.current && !dropdownRef.current.contains(e.target) && setShowDropdown(false);
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
-  // live search for users
+  // 🔹 Search users
   const handleSearch = async (e) => {
     const value = e.target.value;
     setSearch(value);
-    setShowDropdown(true);
     setSelectedUser(null);
-    if (value.trim().length < 1) return setUsers([]);
-
-    try {
-      const res = await axios.get(
-        `http://127.0.0.1:8000/api/v1/auth/users/?q=${value}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      setUsers(res.data.results || res.data);
-    } catch (err) {
-      console.error("User search error:", err);
-    }
+    if (!value.trim()) return setUsers([]);
+    setShowDropdown(true);
+    const res = await axios.get(`${API}/auth/users/?q=${value}`, { headers });
+    setUsers(res.data.results || res.data);
   };
 
-  // add member (Admin/Owner only)
-  const handleAddMember = async (e) => {
+  // 🔹 Add member
+  const handleAdd = async (e) => {
     e.preventDefault();
-    if (!selectedUser) return alert("Please select a user first!");
+    if (!selectedUser) return alert("Select a user first!");
     try {
       await axios.post(
-        `http://127.0.0.1:8000/api/v1/projects/${id}/members/`,
-        { user: selectedUser.id, role: addRole },
-        { headers: { Authorization: `Bearer ${token}` } }
+        `${API}/projects/${id}/members/`,
+        { user_id: selectedUser.id, role: addRole },
+        { headers }
       );
-      alert("✅ Member added!");
       setSearch("");
       setSelectedUser(null);
       setShowDropdown(false);
-      const refreshed = await axios.get(
-        `http://127.0.0.1:8000/api/v1/projects/${id}/members/`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      setMembers(refreshed.data.results || refreshed.data);
-    } catch (err) {
-      console.error("Add member failed:", err.response?.data || err.message);
-      alert("❌ Failed to add member");
+      const refresh = await axios.get(`${API}/projects/${id}/members/`, { headers });
+      setMembers(refresh.data.results || refresh.data);
+    } catch {
+      alert("Failed to add member");
     }
   };
 
-  // remove member (Admin/Owner only)
-  const handleRemove = async (memberId) => {
+  // 🔹 Remove member
+  const handleRemove = async (mid) => {
     if (!window.confirm("Remove this member?")) return;
-    try {
-      await axios.delete(
-        `http://127.0.0.1:8000/api/v1/projects/${id}/members/${memberId}/`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      setMembers(members.filter((m) => m.id !== memberId));
-    } catch (err) {
-      console.error("Remove failed:", err);
-    }
+    await axios.delete(`${API}/projects/${id}/members/${mid}/`, { headers });
+    setMembers(members.filter((m) => m.id !== mid));
   };
 
-  const canManage = role === "OWNER" || role === "ADMIN";
-
-  // role-based style
-  const getRoleStyle = (role) => {
-    switch (role) {
-      case "OWNER":
-        return {
-          background: "linear-gradient(135deg, #fef3c7, #fde68a)",
-          color: "#78350f",
-          boxShadow: "0 2px 5px rgba(250, 204, 21, 0.3)",
-          transition: "all 0.25s ease-in-out",
-        };
-      case "ADMIN":
-        return {
-          background: "linear-gradient(135deg, #dbeafe, #93c5fd)",
-          color: "#1e3a8a",
-          boxShadow: "0 2px 5px rgba(59,130,246,0.3)",
-          transition: "all 0.25s ease-in-out",
-        };
-      case "MEMBER":
-        return {
-          background: "linear-gradient(135deg, #dcfce7, #86efac)",
-          color: "#065f46",
-          boxShadow: "0 2px 5px rgba(34,197,94,0.3)",
-          transition: "all 0.25s ease-in-out",
-        };
-      case "VIEWER":
-        return {
-          background: "linear-gradient(135deg, #f3f4f6, #e5e7eb)",
-          color: "#374151",
-          boxShadow: "0 2px 5px rgba(156,163,175,0.3)",
-          transition: "all 0.25s ease-in-out",
-        };
-      default:
-        return {
-          background: "#f3f4f6",
-          color: "#374151",
-        };
-    }
+  // 🔹 Role style
+  const roleStyle = {
+    OWNER: { bg: "#fde68a", color: "#78350f" },
+    ADMIN: { bg: "#93c5fd", color: "#1e3a8a" },
+    MEMBER: { bg: "#86efac", color: "#065f46" },
+    VIEWER: { bg: "#e5e7eb", color: "#374151" },
   };
 
   return (
     <div
       style={{
-        maxWidth: "700px",
+        maxWidth: 700,
         margin: "60px auto",
         background: "#fff",
-        borderRadius: "12px",
-        padding: "30px",
+        borderRadius: 12,
+        padding: 30,
         boxShadow: "0 4px 10px rgba(0,0,0,0.05)",
       }}
     >
-      <h1
-        style={{
-          textAlign: "center",
-          fontWeight: "700",
-          color: "#1e293b",
-          fontSize: "1.8rem",
-          marginBottom: "25px",
-        }}
-      >
-        👥 Project Members
-      </h1>
-
-      <p style={{ textAlign: "center", color: "#64748b", marginBottom: "20px" }}>
+      <h1 style={{ textAlign: "center", color: "#1e293b" }}>👥 Project Members</h1>
+      <p style={{ textAlign: "center", color: "#64748b" }}>
         <strong>Your Role:</strong> {role}
       </p>
 
-      {/* Add member (Only for Admin/Owner) */}
+      {/* Add Member */}
       {canManage && (
         <form
-          onSubmit={handleAddMember}
+          onSubmit={handleAdd}
           ref={dropdownRef}
-          style={{ position: "relative", marginBottom: "25px" }}
+          style={{ position: "relative", marginBottom: 25 }}
         >
           <input
             type="text"
@@ -199,30 +122,26 @@ function ProjectMembers() {
             onFocus={() => setShowDropdown(true)}
             style={{
               width: "100%",
-              padding: "12px",
-              borderRadius: "6px",
+              padding: 12,
+              borderRadius: 6,
               border: "1px solid #cbd5e1",
-              fontSize: "15px",
-              marginBottom: "10px",
+              marginBottom: 10,
             }}
           />
-
           {showDropdown && users.length > 0 && (
             <ul
               style={{
                 position: "absolute",
-                top: "48px",
+                top: 50,
                 left: 0,
                 right: 0,
                 background: "#fff",
-                listStyle: "none",
-                padding: 0,
-                borderRadius: "6px",
+                borderRadius: 6,
                 border: "1px solid #e2e8f0",
                 boxShadow: "0 4px 10px rgba(0,0,0,0.1)",
-                zIndex: 20,
-                maxHeight: "200px",
+                maxHeight: 200,
                 overflowY: "auto",
+                zIndex: 10,
               }}
             >
               {users.map((u) => (
@@ -242,9 +161,7 @@ function ProjectMembers() {
                   onMouseLeave={(e) => (e.target.style.background = "#fff")}
                 >
                   <strong>{u.username}</strong>{" "}
-                  <span style={{ color: "#64748b", fontSize: "0.85rem" }}>
-                    ({u.email})
-                  </span>
+                  <span style={{ color: "#64748b", fontSize: "0.85rem" }}>({u.email})</span>
                 </li>
               ))}
             </ul>
@@ -255,32 +172,28 @@ function ProjectMembers() {
             onChange={(e) => setAddRole(e.target.value)}
             style={{
               width: "100%",
-              padding: "10px",
-              borderRadius: "6px",
+              padding: 10,
+              borderRadius: 6,
               border: "1px solid #cbd5e1",
-              fontSize: "15px",
-              marginTop: "8px",
-              marginBottom: "12px",
+              marginBottom: 12,
             }}
           >
-            <option value="OWNER">Owner</option>
-            <option value="ADMIN">Admin</option>
-            <option value="MEMBER">Member</option>
-            <option value="VIEWER">Viewer</option>
+            {["OWNER", "ADMIN", "MEMBER", "VIEWER"].map((r) => (
+              <option key={r} value={r}>
+                {r}
+              </option>
+            ))}
           </select>
-
           <button
             type="submit"
             style={{
               width: "100%",
-              padding: "12px",
+              padding: 12,
               background: "#3b82f6",
               color: "#fff",
               border: "none",
-              borderRadius: "6px",
-              fontSize: "16px",
+              borderRadius: 6,
               cursor: "pointer",
-              fontWeight: "500",
             }}
           >
             ➕ Add Member
@@ -288,7 +201,7 @@ function ProjectMembers() {
         </form>
       )}
 
-      {/* Members list */}
+      {/* Member List */}
       {members.length === 0 ? (
         <p style={{ textAlign: "center", color: "#64748b" }}>No members yet.</p>
       ) : (
@@ -299,8 +212,8 @@ function ProjectMembers() {
               style={{
                 background: "#f8fafc",
                 padding: "15px 20px",
-                marginBottom: "10px",
-                borderRadius: "8px",
+                marginBottom: 10,
+                borderRadius: 8,
                 border: "1px solid #e2e8f0",
                 display: "flex",
                 justifyContent: "space-between",
@@ -308,30 +221,25 @@ function ProjectMembers() {
               }}
             >
               <div>
-                <h3 style={{ margin: "0 0 5px", color: "#1e293b" }}>
-                  {m.user.username}
-                </h3>
+                <h3 style={{ margin: 0, color: "#1e293b" }}>{m.user.username}</h3>
                 <div
                   style={{
-                    ...getRoleStyle(m.role),
+                    background: roleStyle[m.role]?.bg,
+                    color: roleStyle[m.role]?.color,
                     display: "inline-block",
-                    padding: "6px 14px",
-                    borderRadius: "9999px",
-                    fontSize: "13px",
-                    fontWeight: "600",
-                    marginTop: "6px",
-                    transform: "translateY(0)",
+                    padding: "4px 10px",
+                    borderRadius: 999,
+                    fontSize: 13,
+                    fontWeight: 600,
+                    marginTop: 6,
                   }}
                 >
                   {m.role}
                 </div>
-                <p
-                  style={{ margin: "0", color: "#94a3b8", fontSize: "0.85rem" }}
-                >
+                <p style={{ margin: 0, color: "#94a3b8", fontSize: 13 }}>
                   Joined {new Date(m.joined_at).toLocaleDateString()}
                 </p>
               </div>
-
               {canManage && (
                 <button
                   onClick={() => handleRemove(m.id)}
@@ -339,10 +247,9 @@ function ProjectMembers() {
                     background: "#ef4444",
                     color: "#fff",
                     border: "none",
-                    borderRadius: "6px",
-                    padding: "8px 12px",
+                    borderRadius: 6,
+                    padding: "6px 10px",
                     cursor: "pointer",
-                    fontSize: "14px",
                   }}
                 >
                   Remove
@@ -354,22 +261,20 @@ function ProjectMembers() {
       )}
 
       <button
-        onClick={() => (window.location.href = "/dashboard")}
-        style={{
-          display: "block",
-          margin: "25px auto 0",
-          background: "#94a3b8",
-          color: "#fff",
-          border: "none",
-          borderRadius: "6px",
-          padding: "10px 20px",
-          cursor: "pointer",
-        }}
-      >
-        ← Back to Dashboard
-      </button>
+          onClick={() => (window.location.href = `/projects/${id}/details`)}
+          style={{
+            display: "block",
+            margin: "30px auto 0",
+            background: "#64748b",
+            color: "#fff",
+            border: "none",
+            borderRadius: 6,
+            padding: "10px 20px",
+            cursor: "pointer",
+          }}
+        >
+          ← Back to Project
+        </button>
     </div>
   );
 }
-
-export default ProjectMembers;

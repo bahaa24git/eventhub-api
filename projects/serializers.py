@@ -189,6 +189,5 @@ class ProjectDashboardSerializer(serializers.Serializer):
         ).count()
     
 
-from rest_framework import serializers
 
 

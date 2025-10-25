@@ -213,6 +213,12 @@ export default function ProjectDashboard() {
               📊 Generate Report
             </button>
           ) : null}
+          <button
+          onClick={() => (window.location.href = `/projects/${id}/details`)}
+          style={btn("#64748b")}
+        >
+          ← Back to Project
+        </button>
         </div>
       </div>
     </Layout>

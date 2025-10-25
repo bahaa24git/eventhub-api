@@ -4,7 +4,7 @@ from rest_framework.response import Response
 from django.db.models import Count, Q, Max
 from django.utils import timezone
 from django.shortcuts import get_object_or_404
-
+from rest_framework import serializers
 from .models import (
     Project, ProjectMember, Label, Task, Subtask,
     Comment, Attachment
@@ -18,6 +18,11 @@ from .serializers import (
 from .permissions import (
     IsProjectMember, IsOwnerOrAdmin, IsTaskAssigneeOrAdmin, IsNotViewer
 )
+from rest_framework import status
+from django.contrib.auth import get_user_model
+
+
+User = get_user_model()
 
 
 # --------------------------------------------------------------------
@@ -112,7 +117,21 @@ class ProjectMemberViewSet(viewsets.ModelViewSet):
         return ProjectMember.objects.filter(project_id=self.kwargs["project_pk"])
 
     def perform_create(self, serializer):
-        serializer.save(project_id=self.kwargs.get("project_pk"))
+        project_id = self.kwargs.get("project_pk")
+        user_id = self.request.data.get("user_id")  # 👈 Expect this in the request
+
+        if not user_id:
+            raise serializers.ValidationError({"user_id": "This field is required."})
+
+        project = get_object_or_404(Project, id=project_id)
+        user = get_object_or_404(User, id=user_id)
+
+        # prevent duplicates
+        if ProjectMember.objects.filter(project=project, user=user).exists():
+            raise serializers.ValidationError("User is already a member of this project.")
+
+        role = self.request.data.get("role", ProjectMember.Role.MEMBER)
+        serializer.save(project=project, user=user, role=role)
 
 
 # --------------------------------------------------------------------
