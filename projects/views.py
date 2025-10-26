@@ -21,7 +21,13 @@ from .permissions import (
 from rest_framework import status
 from django.contrib.auth import get_user_model
 
-
+from io import BytesIO
+from django.http import FileResponse
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfgen import canvas
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from events.models import ActivityLog
 User = get_user_model()
 
 
@@ -277,3 +283,98 @@ class AttachmentViewSet(viewsets.ModelViewSet):
             filename=file_obj.name if file_obj else "",
             size=file_obj.size if file_obj else 0,
         )
+
+
+# projects/views.py
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def project_report(request, pk):
+    """Generate a simple text-style project summary PDF that matches dashboard."""
+    try:
+        project = Project.objects.get(pk=pk)
+    except Project.DoesNotExist:
+        return Response({"error": "Project not found"}, status=404)
+
+    buffer = BytesIO()
+    p = canvas.Canvas(buffer, pagesize=A4)
+
+    # --- Header ---
+    p.setFont("Helvetica-Bold", 18)
+    p.drawString(200, 800, "■ Project Report")
+
+    p.setFont("Helvetica-Bold", 14)
+    p.drawString(60, 770, f"Project: {project.name}")
+    p.setFont("Helvetica", 12)
+    p.drawString(60, 750, f"Description: {project.description or '-'}")
+    p.drawString(60, 730, f"Created at: {project.created_at.strftime('%Y-%m-%d')}")
+
+    # --- Dashboard Stats ---
+    total_tasks = Task.objects.filter(project=project, deleted_at__isnull=True).count()
+    completed_tasks = Task.objects.filter(project=project, status="DONE").count()
+    total_subtasks = Subtask.objects.filter(task__project=project).count()
+    completed_subtasks = Subtask.objects.filter(task__project=project, is_done=True).count()
+    members_count = ProjectMember.objects.filter(project=project).count()
+    labels_count = Label.objects.filter(project=project).count()
+    comments_count = Comment.objects.filter(task__project=project).count()
+    attachments_count = Attachment.objects.filter(task__project=project).count()
+    today = timezone.now().date()
+    overdue_tasks = Task.objects.filter(
+        project=project,
+        due_date__lt=today,
+        status__in=["TODO", "IN_PROGRESS", "BLOCKED"],
+        deleted_at__isnull=True,
+    ).count()
+
+    # Completion %
+    task_completion = (completed_tasks / total_tasks * 100) if total_tasks else 0
+    subtask_completion = (completed_subtasks / total_subtasks * 100) if total_subtasks else 0
+
+    y = 700
+    p.setFont("Helvetica", 12)
+    stats = [
+        ("Total Tasks", total_tasks),
+        ("Completed Tasks", completed_tasks),
+        ("Subtasks", total_subtasks),
+        ("Completed Subtasks", completed_subtasks),
+        ("Task Completion", f"{task_completion:.0f}%"),
+        ("Subtask Completion", f"{subtask_completion:.0f}%"),
+        ("Members", members_count),
+        ("Labels", labels_count),
+        ("Comments", comments_count),
+        ("Attachments", attachments_count),
+        ("Overdue Tasks", overdue_tasks),
+    ]
+    for name, val in stats:
+        p.drawString(60, y, f"{name}: {val}")
+        y -= 20
+
+    # --- Activity Logs ---
+    y -= 20
+    p.setFont("Helvetica-Bold", 14)
+    p.drawString(60, y, "Recent Activity:")
+    p.setFont("Helvetica", 12)
+    y -= 20
+
+    logs = ActivityLog.objects.filter(project=project).order_by("-timestamp")[:10]
+    if not logs:
+        p.drawString(80, y, "No recent activity recorded.")
+    else:
+        for log in logs:
+            username = log.user.username if log.user else "System"
+            obj = log.object_type or "Object"
+            action = log.action or ""
+            desc = log.description or ""
+            time = log.timestamp.strftime("%Y-%m-%d %H:%M")
+            p.drawString(80, y, f"- [{time}] {username} {action} {obj}: {desc[:60]}")
+            y -= 20
+            if y < 60:
+                p.showPage()
+                y = 780
+
+    p.showPage()
+    p.save()
+    buffer.seek(0)
+
+    filename = f"{project.name.replace(' ', '_')}_Report.pdf"
+    return FileResponse(buffer, as_attachment=True, filename=filename)

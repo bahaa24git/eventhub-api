@@ -410,6 +410,22 @@ function Projects() {
                         🗑️ Delete
                       </button>
                     )}
+                    <button
+                  onClick={() => 
+                    (window.location.href = `/projects/${project.id}/details`)
+                  }
+                  style={{
+                          background: "#3b82f6",
+                          border: "none",
+                          color: "#fff",
+                          padding: "8px 12px",
+                          borderRadius: "5px",
+                          cursor: "pointer",
+                          fontSize: "14px",
+                        }}
+                >
+                  View Details →
+                </button>
                   </div>
                 </li>
               );

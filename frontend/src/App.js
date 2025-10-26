@@ -15,6 +15,7 @@ import ProjectAttachments from "./pages/ProjectAttachments";
 import TaskComments from "./pages/TaskComments";
 import TaskSubtasks from "./pages/SubTasks";
 import ProjectDashboard from "./pages/ProjectDashboard";
+import Settings from "./pages/Settings";
 
 function App() {
   return (
@@ -35,6 +36,7 @@ function App() {
         <Route path="/projects/:id/tasks/:taskId/comments" element={<TaskComments />} />
         <Route path="/projects/:id/tasks/:taskId/subtasks" element={<TaskSubtasks />} />
         <Route path="/projects/:id/dashboard" element={<ProjectDashboard />} />
+        <Route path="/settings" element={<Settings />} />
       </Routes>
     </Router>
   );

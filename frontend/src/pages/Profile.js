@@ -12,8 +12,10 @@ function Profile() {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [avatar, setAvatar] = useState(null);
+  const [avatarPreview, setAvatarPreview] = useState("");
 
-  // Fetch current user profile
+  // Fetch user profile
   useEffect(() => {
     if (!token) {
       window.location.href = "/";
@@ -22,14 +24,15 @@ function Profile() {
 
     const fetchProfile = async () => {
       try {
-        const res = await axios.get("http://127.0.0.1:8000/api/v1/auth/me/", {
+        const res = await axios.get("http://127.0.0.1:8000/api/v1/auth/profile/", {
           headers: { Authorization: `Bearer ${token}` },
         });
         setProfile(res.data);
-        setId(res.data.id || "");
-        setUsername(res.data.username || "");
-        setEmail(res.data.email || "");
+        setId(res.data.user?.id || res.data.id || "");
+        setUsername(res.data.user?.username || res.data.username || "");
+        setEmail(res.data.user?.email || res.data.email || "");
         setPhone(res.data.phone || "");
+        setAvatarPreview(res.data.avatar_url || "");
       } catch (err) {
         console.error("Error fetching profile:", err.response?.data || err.message);
         alert("Failed to load profile");
@@ -41,17 +44,40 @@ function Profile() {
     fetchProfile();
   }, [token]);
 
+  // Handle avatar selection
+  const handleAvatarChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setAvatar(file);
+      setAvatarPreview(URL.createObjectURL(file)); // instant preview
+    }
+  };
+
   // Handle profile update
   const handleUpdate = async (e) => {
     e.preventDefault();
     setSaving(true);
+
     try {
+      const formData = new FormData();
+      formData.append("username", username);
+      formData.append("email", email);
+      formData.append("phone", phone);
+      if (avatar) formData.append("avatar", avatar);
+
       const res = await axios.put(
         "http://127.0.0.1:8000/api/v1/auth/profile/",
-        { username, email, phone },
-        { headers: { Authorization: `Bearer ${token}` } }
+        formData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "multipart/form-data",
+          },
+        }
       );
+
       setProfile(res.data);
+      setAvatarPreview(res.data.avatar_url || avatarPreview);
       alert("✅ Profile updated successfully!");
     } catch (err) {
       console.error("Update error:", err.response?.data || err.message);
@@ -93,79 +119,81 @@ function Profile() {
           👤 My Profile
         </h2>
 
-        <form onSubmit={handleUpdate}>
-          {/* ID (read-only) */}
-          <label style={{ display: "block", marginBottom: "6px", color: "#475569" }}>
-            ID
-          </label>
-          <input
-            type="text"
-            value={id}
-            readOnly
+        {/* Avatar Upload */}
+        <div style={{ textAlign: "center", marginBottom: "25px" }}>
+          <img
+            src={
+              avatarPreview ||
+              "https://cdn-icons-png.flaticon.com/512/149/149071.png"
+            }
+            alt="Avatar"
             style={{
-              width: "100%",
-              padding: "10px",
-              marginBottom: "15px",
-              borderRadius: "6px",
-              border: "1px solid #cbd5e1",
-              background: "#f1f5f9",
-              color: "#475569",
+              width: "100px",
+              height: "100px",
+              borderRadius: "50%",
+              objectFit: "cover",
+              marginBottom: "10px",
+              border: "2px solid #cbd5e1",
             }}
           />
+          <div>
+            <label
+              style={{
+                background: "#3b82f6",
+                color: "#fff",
+                padding: "8px 14px",
+                borderRadius: "6px",
+                cursor: "pointer",
+                fontSize: "0.9rem",
+                fontWeight: "500",
+              }}
+            >
+              📷 Upload Avatar
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleAvatarChange}
+                style={{ display: "none" }}
+              />
+            </label>
+          </div>
+        </div>
+
+        <form onSubmit={handleUpdate}>
+          {/* ID (read-only) */}
+          <label style={labelStyle}>ID</label>
+          <input type="text" value={id} readOnly style={readonlyInput} />
 
           {/* Username */}
-          <label style={{ display: "block", marginBottom: "6px", color: "#475569" }}>
-            Username
-          </label>
+          <label style={labelStyle}>Username</label>
           <input
             type="text"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             required
-            style={{
-              width: "100%",
-              padding: "10px",
-              marginBottom: "15px",
-              borderRadius: "6px",
-              border: "1px solid #cbd5e1",
-            }}
+            style={inputStyle}
           />
 
           {/* Email */}
-          <label style={{ display: "block", marginBottom: "6px", color: "#475569" }}>
-            Email
-          </label>
+          <label style={labelStyle}>Email</label>
           <input
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            style={{
-              width: "100%",
-              padding: "10px",
-              marginBottom: "15px",
-              borderRadius: "6px",
-              border: "1px solid #cbd5e1",
-            }}
+            style={inputStyle}
           />
 
           {/* Phone */}
-          <label style={{ display: "block", marginBottom: "6px", color: "#475569" }}>
-            Phone Number
-          </label>
+          <label style={labelStyle}>Phone Number</label>
           <input
             type="text"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
             placeholder="e.g. +201112223334"
-            style={{
-              width: "100%",
-              padding: "10px",
-              marginBottom: "20px",
-              borderRadius: "6px",
-              border: "1px solid #cbd5e1",
-            }}
+            style={inputStyle}
           />
 
+          {/* Save Button */}
           <button
             type="submit"
             disabled={saving}
@@ -204,5 +232,20 @@ function Profile() {
     </Layout>
   );
 }
+
+// Shared styles
+const labelStyle = { display: "block", marginBottom: "6px", color: "#475569" };
+const inputStyle = {
+  width: "100%",
+  padding: "10px",
+  marginBottom: "15px",
+  borderRadius: "6px",
+  border: "1px solid #cbd5e1",
+};
+const readonlyInput = {
+  ...inputStyle,
+  background: "#f1f5f9",
+  color: "#475569",
+};
 
 export default Profile;

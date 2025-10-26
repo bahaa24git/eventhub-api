@@ -21,17 +21,6 @@ class SoftDeleteManager(models.Manager):
         return super().get_queryset().filter(deleted_at__isnull=True)
 
 
-class Profile(models.Model):
-    """User profile (1:1)"""
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
-    phone = models.CharField(max_length=32, blank=True)
-    avatar_url = models.CharField(max_length=512, blank=True)
-    timezone = models.CharField(max_length=64, default="UTC", blank=True)
-    class Meta:
-        verbose_name_plural = "Profiles"
-
-    def __str__(self):
-        return f"Profile({self.user})"
 
 
 class Project(models.Model):

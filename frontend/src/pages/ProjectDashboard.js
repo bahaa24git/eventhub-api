@@ -94,7 +94,30 @@ export default function ProjectDashboard() {
       </p>
     </div>
   );
+  const handleGenerateReport = async () => {
+  try {
+    const token = localStorage.getItem("token");
+    const res = await axios.get(
+      `http://127.0.0.1:8000/api/v1/projects/${id}/report/`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+        responseType: "blob", // tells browser it's a file (PDF)
+      }
+    );
 
+    // Create a download link for the file
+    const url = window.URL.createObjectURL(new Blob([res.data]));
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `Project_${id}_Report.pdf`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  } catch (err) {
+    console.error("Error generating report:", err);
+    alert("❌ Failed to generate report");
+  }
+};
   return (
     <Layout>
       <div
@@ -207,11 +230,11 @@ export default function ProjectDashboard() {
           </button>
           {role === "OWNER" || role === "ADMIN" ? (
             <button
-              style={btn("#22c55e")}
-              onClick={() => alert("Report generation coming soon!")}
-            >
-              📊 Generate Report
-            </button>
+  style={btn("#22c55e")}
+  onClick={handleGenerateReport}
+>
+  📊 Generate Report
+</button>
           ) : null}
           <button
           onClick={() => (window.location.href = `/projects/${id}/details`)}

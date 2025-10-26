@@ -20,6 +20,13 @@ function Login() {
       if (response.status === 200) {
         localStorage.setItem("token", response.data.access);
         localStorage.setItem("refresh", response.data.refresh);
+        const profile = await axios.get("http://127.0.0.1:8000/api/v1/auth/me/", {
+        headers: { Authorization: `Bearer ${response.data.access}` },
+        });
+
+        // ✅ save the user profile locally for the navbar
+        localStorage.setItem("user", JSON.stringify(profile.data));
+
         alert("✅ Login successful!");
         window.location.href = "/dashboard";
       }

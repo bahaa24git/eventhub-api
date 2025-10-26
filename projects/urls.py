@@ -6,7 +6,7 @@ from .views import (
     TaskViewSet, SubtaskViewSet, CommentViewSet, AttachmentViewSet
 )
 from events.views import ActivityLogViewSet  # 👈 import the ActivityLog viewset
-
+from .views import project_report
 
 # Base router
 router = routers.DefaultRouter()
@@ -34,4 +34,5 @@ urlpatterns = [
     path('', include(router.urls)),
     path('', include(projects_router.urls)),
     path('', include(tasks_router.urls)),
+    path("projects/<uuid:pk>/report/", project_report, name="project-report"),
 ]

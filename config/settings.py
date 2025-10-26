@@ -43,11 +43,10 @@ INSTALLED_APPS = [
     "drf_spectacular",
 
     # Local apps
-    "events",
-    
-    "users",
-    "projects",
-    'accounts',
+    "events.apps.EventsConfig",
+    "users.apps.UsersConfig",
+    "accounts.apps.AccountsConfig",
+    "projects.apps.ProjectsConfig",
 
 ]
 
@@ -217,3 +216,5 @@ LOGGING = {
     "handlers": {"console": {"class": "logging.StreamHandler"}},
     "root": {"handlers": ["console"], "level": "INFO"},
 }
+
+AUTH_USER_MODEL = "users.AppUser"
