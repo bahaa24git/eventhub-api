@@ -110,6 +110,36 @@ class ProjectViewSet(viewsets.ModelViewSet):
         serializer = ProjectDashboardSerializer(data)
         return Response(serializer.data)
 
+    # ✅ NEW: Archive / Unarchive project
+    @action(
+        detail=True,
+        methods=["post"],
+        url_path="archive",
+        permission_classes=[permissions.IsAuthenticated, IsOwnerOrAdmin],
+    )
+    def toggle_archive(self, request, pk=None):
+        """Toggle a project's archived status (Active ↔ Archived)."""
+        project = self.get_object()
+        project.is_archived = not project.is_archived
+        project.save()
+
+        # Optional: log the action
+        ActivityLog.objects.create(
+            project=project,
+            user=request.user,
+            action="archived" if project.is_archived else "unarchived",
+            object_type="Project",
+            description=f"{request.user.username} {'archived' if project.is_archived else 'unarchived'} the project {project.name}."
+        )
+
+        return Response(
+            {
+                "message": f"Project {'archived' if project.is_archived else 'unarchived'} successfully.",
+                "is_archived": project.is_archived,
+            },
+            status=status.HTTP_200_OK,
+        )
+
 
 # --------------------------------------------------------------------
 # 🧩 Project Members

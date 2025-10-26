@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 from .models import (
     Project, ProjectMember, Label, Task, Subtask,
     TaskAssignee, TaskLabel, Comment, Attachment
@@ -7,13 +8,11 @@ from .models import (
 
 User = get_user_model()
 
-
 # --- User ---
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ["id", "username", "email" ,"phone"]
-
+        fields = ["id", "username", "email", "phone"]
 
 # --- Project Member ---
 class ProjectMemberSerializer(serializers.ModelSerializer):
@@ -24,13 +23,11 @@ class ProjectMemberSerializer(serializers.ModelSerializer):
         fields = ["id", "user", "role", "joined_at"]
         read_only_fields = ["id", "joined_at"]
 
-
 # --- Label ---
 class LabelSerializer(serializers.ModelSerializer):
     class Meta:
         model = Label
         fields = ["id", "name", "color_hex"]
-
 
 # --- Task Assignee ---
 class TaskAssigneeSerializer(serializers.ModelSerializer):
@@ -40,7 +37,6 @@ class TaskAssigneeSerializer(serializers.ModelSerializer):
         model = TaskAssignee
         fields = ["id", "user", "assigned_at"]
 
-
 # --- Comment ---
 class CommentSerializer(serializers.ModelSerializer):
     author = UserSerializer(read_only=True)
@@ -48,7 +44,6 @@ class CommentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Comment
         fields = ["id", "body", "author", "created_at", "edited_at"]
-
 
 # --- Attachment ---
 class AttachmentSerializer(serializers.ModelSerializer):
@@ -61,13 +56,11 @@ class AttachmentSerializer(serializers.ModelSerializer):
             "size", "uploader", "created_at"
         ]
 
-
 # --- Subtask ---
 class SubtaskSerializer(serializers.ModelSerializer):
     class Meta:
         model = Subtask
         fields = ["id", "title", "is_done", "created_at"]
-
 
 # --- Task ---
 class TaskSerializer(serializers.ModelSerializer):
@@ -121,7 +114,7 @@ class TaskSerializer(serializers.ModelSerializer):
             [TaskAssignee(task=task, user=u) for u in users]
         )
 
-# --- helper: assign labels ---
+    # --- helper: assign labels ---
     def _set_labels(self, task, label_ids):
         TaskLabel.objects.filter(task=task).exclude(label_id__in=label_ids).delete()
         if not label_ids:
@@ -150,9 +143,9 @@ class TaskSerializer(serializers.ModelSerializer):
             self._set_labels(task, label_ids)
         return task
 
-
 # --- Project ---
 class ProjectSerializer(serializers.ModelSerializer):
+    created_by = UserSerializer(read_only=True)  # ✅ now nested user info
     members = ProjectMemberSerializer(many=True, read_only=True)
     labels = LabelSerializer(many=True, read_only=True)
 
@@ -164,7 +157,7 @@ class ProjectSerializer(serializers.ModelSerializer):
             "members", "labels"
         ]
 
-
+# --- Dashboard ---
 class ProjectDashboardSerializer(serializers.Serializer):
     project_id = serializers.UUIDField()
     project_name = serializers.CharField()
@@ -187,7 +180,3 @@ class ProjectDashboardSerializer(serializers.Serializer):
             due_date__lt=today,
             status__in=["TODO", "IN_PROGRESS", "BLOCKED"]
         ).count()
-    
-
-
-

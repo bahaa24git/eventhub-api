@@ -55,6 +55,21 @@ function ProjectDetails() {
     fetchProjectData();
   }, [id, token]);
 
+  const handleToggleArchive = async () => {
+    try {
+      const res = await axios.post(
+        `http://127.0.0.1:8000/api/v1/projects/${project.id}/archive/`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      alert(res.data.message);
+      setProject((prev) => ({ ...prev, is_archived: !prev.is_archived }));
+    } catch (err) {
+      console.error("Failed to toggle archive:", err);
+      alert("Failed to update project status.");
+    }
+  };
+
   if (loading)
     return (
       <Layout>
@@ -119,11 +134,44 @@ function ProjectDetails() {
             title="Created At"
             value={new Date(project.created_at).toLocaleDateString()}
           />
-          <InfoCard
-            title="Status"
-            value={project.is_archived ? "Archived" : "Active"}
-            color={project.is_archived ? "#ef4444" : "#22c55e"}
-          />
+          {/* Status with toggle */}
+          <div
+            style={{
+              flex: 1,
+              background: "#f1f5f9",
+              borderRadius: "10px",
+              padding: "15px",
+              minWidth: "200px",
+              textAlign: "center",
+            }}
+          >
+            <h4 style={{ color: "#64748b", margin: 0 }}>Status</h4>
+            <p
+              style={{
+                fontWeight: "600",
+                color: project.is_archived ? "#ef4444" : "#22c55e",
+                margin: "0 0 10px 0",
+              }}
+            >
+              {project.is_archived ? "Archived" : "Active"}
+            </p>
+            {canManage && (
+              <button
+                onClick={handleToggleArchive}
+                style={{
+                  background: project.is_archived ? "#22c55e" : "#ef4444",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: "6px",
+                  padding: "6px 12px",
+                  fontSize: "14px",
+                  cursor: "pointer",
+                }}
+              >
+                {project.is_archived ? "Unarchive" : "Archive"}
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Members */}
@@ -213,7 +261,6 @@ function ProjectDetails() {
 
         {/* Actions */}
         <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
-          {/* 📊 Dashboard button for everyone */}
           <ActionButton
             color="#0ea5e9"
             text="📊 Project Dashboard"
@@ -221,13 +268,14 @@ function ProjectDetails() {
               (window.location.href = `/projects/${project.id}/dashboard`)
             }
           />
-
           {canManage ? (
             <>
               <ActionButton
                 color="#3b82f6"
                 text="✏️ Edit Project"
-                onClick={() => (window.location.href = `/edit/${project.id}`)}
+                onClick={() =>
+                  (window.location.href = `/edit/${project.id}`)
+                }
               />
               <ActionButton
                 color="#22c55e"
@@ -282,7 +330,7 @@ function ProjectDetails() {
   );
 }
 
-// Helper components
+// Helper Components
 function InfoCard({ title, value, color }) {
   return (
     <div
